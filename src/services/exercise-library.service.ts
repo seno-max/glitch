@@ -2,12 +2,13 @@ import { supabase } from '@/lib/supabase'
 import type { ExerciseLibraryItem } from '@/types/database.types'
 
 export const exerciseLibraryService = {
-  async search(query: string, filters?: { muscle?: string; equipment?: string; category?: string }): Promise<ExerciseLibraryItem[]> {
+  async search(query: string, filters?: { muscle?: string; equipment?: string; category?: string; categories?: string[] }): Promise<ExerciseLibraryItem[]> {
     let q = supabase.from('exercise_library').select('*')
     if (query) q = q.ilike('name', `%${query}%`)
     if (filters?.muscle) q = q.eq('target_muscle', filters.muscle)
     if (filters?.equipment) q = q.eq('equipment', filters.equipment)
-    if (filters?.category) q = q.eq('category', filters.category)
+    if (filters?.categories && filters.categories.length > 0) q = q.in('category', filters.categories)
+    else if (filters?.category) q = q.eq('category', filters.category)
     const { data, error } = await q.order('name', { ascending: true })
     if (error) throw error
     return (data ?? []) as unknown as ExerciseLibraryItem[]

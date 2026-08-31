@@ -28,11 +28,8 @@ export function useDayActivityLog(date: string) {
 
       const workoutSessions = await Promise.all(
         sessions.map(async (session) => {
-          const [strengthExercises, cardioSessions] = await Promise.all([
-            workoutService.getStrengthExercisesBySession(session.id),
-            workoutService.getCardioSessionsBySession(session.id),
-          ])
-          return { ...session, strengthExercises, cardioSessions }
+          const strengthExercises = await workoutService.getStrengthExercisesBySession(session.id)
+          return { ...session, strengthExercises }
         })
       )
 

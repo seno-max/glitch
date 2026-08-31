@@ -12,17 +12,29 @@ export const workoutService = {
   // ---------------------------------------------------------------------
   // Sessions
   // ---------------------------------------------------------------------
-  async startSession(userId: string, workoutTypes: WorkoutType[], title?: string): Promise<WorkoutSession> {
-    const now = new Date()
+  /**
+   * Creates a fully-specified workout session from manual gym-log style
+   * entry: a date plus explicit entry/exit timestamps. Duration is
+   * auto-calculated server-side by the calc_workout_duration trigger.
+   */
+  async createSession(payload: {
+    userId: string
+    date: string
+    gymEntryTime: string
+    gymExitTime: string
+    workoutTypes: WorkoutType[]
+    title?: string | null
+  }): Promise<WorkoutSession> {
     const { data, error } = await supabase
       .from('workout_sessions')
       .insert({
-        user_id: userId,
-        date: now.toISOString().slice(0, 10),
-        gym_entry_time: now.toISOString(),
-        workout_types: workoutTypes,
-        title: title ?? null,
-        is_completed: false,
+        user_id: payload.userId,
+        date: payload.date,
+        gym_entry_time: payload.gymEntryTime,
+        gym_exit_time: payload.gymExitTime,
+        workout_types: payload.workoutTypes,
+        title: payload.title ?? null,
+        is_completed: true,
       })
       .select('*')
       .single()
@@ -30,10 +42,22 @@ export const workoutService = {
     return data as unknown as WorkoutSession
   },
 
-  async endSession(sessionId: string): Promise<WorkoutSession> {
+  async getSessionById(sessionId: string): Promise<WorkoutSession | null> {
+    const { data, error } = await supabase.from('workout_sessions').select('*').eq('id', sessionId).maybeSingle()
+    if (error) throw error
+    return data as unknown as WorkoutSession | null
+  },
+
+  async updateSessionTimes(sessionId: string, patch: { date?: string; gymEntryTime?: string; gymExitTime?: string; workoutTypes?: WorkoutType[]; title?: string | null }): Promise<WorkoutSession> {
+    const updatePayload: Record<string, unknown> = {}
+    if (patch.date !== undefined) updatePayload.date = patch.date
+    if (patch.gymEntryTime !== undefined) updatePayload.gym_entry_time = patch.gymEntryTime
+    if (patch.gymExitTime !== undefined) updatePayload.gym_exit_time = patch.gymExitTime
+    if (patch.workoutTypes !== undefined) updatePayload.workout_types = patch.workoutTypes
+    if (patch.title !== undefined) updatePayload.title = patch.title
     const { data, error } = await supabase
       .from('workout_sessions')
-      .update({ gym_exit_time: new Date().toISOString(), is_completed: true })
+      .update(updatePayload)
       .eq('id', sessionId)
       .select('*')
       .single()

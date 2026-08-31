@@ -1,7 +1,6 @@
 import type {
   WorkoutSession,
   StrengthExercise,
-  CardioSession,
   Meal,
   WaterLog,
   WeightLog,
@@ -63,7 +62,7 @@ export interface TaskItem {
   label: string
   completed: boolean
   icon: string
-  points: number
+  points?: number
   href?: string
 }
 
@@ -93,7 +92,7 @@ export interface PeriodProgress {
 // ----------------------------------------------------------------------------
 export interface DayActivityLog {
   date: string
-  workoutSessions: (WorkoutSession & { strengthExercises: StrengthExercise[]; cardioSessions: CardioSession[] })[]
+  workoutSessions: (WorkoutSession & { strengthExercises: StrengthExercise[] })[]
   meals: Meal[]
   waterLogs: WaterLog[]
   weightLog: WeightLog | null
@@ -146,21 +145,14 @@ export function getLevelForXp(xp: number): { level: number; xpIntoLevel: number;
 // ----------------------------------------------------------------------------
 // Points system
 // ----------------------------------------------------------------------------
+// By design, points are only awarded for the three things that matter most
+// for the weight-loss goal: completing a gym session, hitting 10k steps,
+// and a 5-day gym streak (see STREAK_MILESTONES below). Every other
+// tracked activity (water, food, sleep, weight, photos, mood, etc.) is
+// still logged and visible in the app, it just doesn't award points.
 export const POINTS = {
   GYM_COMPLETED: 100,
   STEPS_10K: 50,
-  STEPS_15K: 80,
-  STEPS_20K: 100,
-  WATER_GOAL: 20,
-  FOOD_LOGGED: 20,
-  SLEEP_GOAL: 30,
-  WEIGHT_LOGGED: 10,
-  PROGRESS_PHOTO: 25,
-  WORKOUT_OVER_90MIN: 20,
-  WORKOUT_BEFORE_8AM: 10,
-  NO_SUGARY_DRINKS: 15,
-  WEEKLY_GOAL_COMPLETED: 200,
-  MONTHLY_GOAL_COMPLETED: 1000,
 } as const
 
 // ----------------------------------------------------------------------------
@@ -183,13 +175,10 @@ export const HEALTH_SCORE_MAX = Object.values(HEALTH_SCORE_WEIGHTS).reduce((a, b
 // ----------------------------------------------------------------------------
 // Streak milestone bonus points
 // ----------------------------------------------------------------------------
-export const STREAK_MILESTONES: { days: number; points: number }[] = [
-  { days: 5, points: 150 },
-  { days: 10, points: 350 },
-  { days: 20, points: 800 },
-  { days: 30, points: 1500 },
-  { days: 100, points: 10000 },
-]
+// Only the gym streak awards a points bonus (5-day streak = 150 pts).
+// Other streak categories (water, sleep, food, weight) are tracked for
+// display purposes only and never award milestone points.
+export const STREAK_MILESTONES: { days: number; points: number }[] = [{ days: 5, points: 150 }]
 
 export function getStreakMilestoneBonus(streakDays: number): number {
   const milestone = STREAK_MILESTONES.find((m) => m.days === streakDays)

@@ -4,16 +4,18 @@ import { Plus, Trash2, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { useActiveWorkoutStore } from '@/stores/active-workout.store'
-import type { EquipmentType } from '@/types/database.types'
+import { useWorkoutLogStore } from '@/stores/workout-log.store'
 import { exerciseLibraryService } from '@/services/exercise-library.service'
 import { useQuery } from '@tanstack/react-query'
 
-const EQUIPMENT_OPTIONS: EquipmentType[] = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'band', 'other']
-
-export function StrengthLogger() {
-  const { draftStrength, addStrengthExercise, updateStrengthExercise, removeStrengthExercise } = useActiveWorkoutStore()
+/**
+ * Unified exercise logger for the manual gym-log workflow. A single entry
+ * captures whatever is relevant: sets + reps + weight for strength work,
+ * and/or sets + duration (seconds) for timed/cardio-style exercises like
+ * "30 secs x 3 sets" burpees. Fields left blank are simply not recorded.
+ */
+export function ExerciseLogger() {
+  const { exercises, addExercise, updateExercise, removeExercise } = useWorkoutLogStore()
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
@@ -23,16 +25,18 @@ export function StrengthLogger() {
     enabled: search.length > 1,
   })
 
-  const addExercise = (name: string) => {
-    addStrengthExercise({
+  const addNewExercise = (name: string) => {
+    addExercise({
       tempId: crypto.randomUUID(),
       exercise_name: name,
-      equipment: 'barbell',
-      weight_kg: 0,
+      equipment: 'bodyweight',
+      weight_kg: null,
       sets: 3,
       reps: 10,
-      rest_seconds: 60,
-      order_index: draftStrength.length,
+      duration_seconds: null,
+      rest_seconds: null,
+      rpe: null,
+      notes: null,
     })
     setSearch('')
     setShowSearch(false)
@@ -41,10 +45,10 @@ export function StrengthLogger() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Strength Exercises</CardTitle>
+        <CardTitle>Exercises</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {draftStrength.map((ex) => (
+        {exercises.map((ex) => (
           <motion.div
             key={ex.tempId}
             initial={{ opacity: 0, y: 8 }}
@@ -53,72 +57,63 @@ export function StrengthLogger() {
           >
             <div className="flex items-center justify-between">
               <p className="font-semibold">{ex.exercise_name}</p>
-              <button onClick={() => removeStrengthExercise(ex.tempId)} className="text-muted-foreground hover:text-destructive">
+              <button onClick={() => removeExercise(ex.tempId)} className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="size-4" />
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Equipment</label>
-                <Select value={ex.equipment} onChange={(e) => updateStrengthExercise(ex.tempId, { equipment: e.target.value as EquipmentType })}>
-                  {EQUIPMENT_OPTIONS.map((eq) => (
-                    <option key={eq} value={eq}>
-                      {eq}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Weight (kg)</label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={ex.weight_kg ?? 0}
-                  onChange={(e) => updateStrengthExercise(ex.tempId, { weight_kg: Number(e.target.value) })}
-                />
-              </div>
-              <div>
                 <label className="text-xs text-muted-foreground">Sets</label>
                 <Input
                   type="number"
-                  value={ex.sets ?? 1}
-                  onChange={(e) => updateStrengthExercise(ex.tempId, { sets: Number(e.target.value) })}
+                  min={1}
+                  value={ex.sets}
+                  onChange={(e) => updateExercise(ex.tempId, { sets: Number(e.target.value) })}
                 />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Reps</label>
                 <Input
                   type="number"
-                  value={ex.reps ?? 1}
-                  onChange={(e) => updateStrengthExercise(ex.tempId, { reps: Number(e.target.value) })}
+                  placeholder="optional"
+                  value={ex.reps ?? ''}
+                  onChange={(e) => updateExercise(ex.tempId, { reps: e.target.value === '' ? null : Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Weight (kg)</label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  placeholder="optional"
+                  value={ex.weight_kg ?? ''}
+                  onChange={(e) => updateExercise(ex.tempId, { weight_kg: e.target.value === '' ? null : Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Timing (sec / set)</label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 30"
+                  value={ex.duration_seconds ?? ''}
+                  onChange={(e) => updateExercise(ex.tempId, { duration_seconds: e.target.value === '' ? null : Number(e.target.value) })}
                 />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Rest (sec)</label>
                 <Input
                   type="number"
-                  value={ex.rest_seconds ?? 60}
-                  onChange={(e) => updateStrengthExercise(ex.tempId, { rest_seconds: Number(e.target.value) })}
+                  placeholder="optional"
+                  value={ex.rest_seconds ?? ''}
+                  onChange={(e) => updateExercise(ex.tempId, { rest_seconds: e.target.value === '' ? null : Number(e.target.value) })}
                 />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">RPE (1-10)</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={ex.rpe ?? ''}
-                  onChange={(e) => updateStrengthExercise(ex.tempId, { rpe: Number(e.target.value) })}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground">Volume</label>
-                <p className="h-11 flex items-center font-semibold text-primary">
-                  {((ex.weight_kg ?? 0) * (ex.sets ?? 0) * (ex.reps ?? 0)).toLocaleString()} kg
-                </p>
               </div>
             </div>
-            <Input placeholder="Notes (optional)" value={ex.notes ?? ''} onChange={(e) => updateStrengthExercise(ex.tempId, { notes: e.target.value })} />
+            <Input
+              placeholder="Notes (optional)"
+              value={ex.notes ?? ''}
+              onChange={(e) => updateExercise(ex.tempId, { notes: e.target.value || null })}
+            />
           </motion.div>
         ))}
 
@@ -129,7 +124,7 @@ export function StrengthLogger() {
               <Input
                 autoFocus
                 className="pl-9"
-                placeholder="Search exercises (e.g. Bench Press)..."
+                placeholder="Search exercises (e.g. Burpees, Bench Press)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -139,7 +134,7 @@ export function StrengthLogger() {
                 {exerciseResults.map((ex) => (
                   <button
                     key={ex.id}
-                    onClick={() => addExercise(ex.name)}
+                    onClick={() => addNewExercise(ex.name)}
                     className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors text-sm"
                   >
                     <span className="font-medium">{ex.name}</span>
@@ -149,7 +144,7 @@ export function StrengthLogger() {
               </div>
             )}
             {search.length > 1 && (
-              <Button variant="outline" size="sm" className="w-full" onClick={() => addExercise(search)}>
+              <Button variant="outline" size="sm" className="w-full" onClick={() => addNewExercise(search)}>
                 Add "{search}" as custom exercise
               </Button>
             )}

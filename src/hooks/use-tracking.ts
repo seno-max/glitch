@@ -87,21 +87,6 @@ export function useLogWeight() {
       if (user) {
         await profileService.updateProfile(user.id, { current_weight_kg: log.weight_kg })
         await updateStreak(user.id, 'weight_logging', log.date)
-        if (log.date === todayStr()) {
-          await awardDailyPoints(user.id, log.date, {
-            gymCompleted: false,
-            steps: 0,
-            waterMl: 0,
-            waterGoalMl: 3000,
-            mealsLogged: 0,
-            sleepHours: null,
-            sleepGoalHours: 8,
-            weightLogged: true,
-            stretchingDone: false,
-            moodLogged: false,
-            photoLogged: false,
-          })
-        }
 
         // Check for weight PRs
         const lowest = await gamificationService.getBestPersonalRecord(user.id, 'lowest_weight')
@@ -156,6 +141,9 @@ export function useLogSteps() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       if (user && log.steps >= 10000) {
         await updateStreak(user.id, 'steps', log.date)
+        if (log.date === todayStr()) {
+          await awardDailyPoints(user.id, log.date, { gymCompleted: false, steps: log.steps })
+        }
       }
       toast.success('Steps updated!')
     },
@@ -261,23 +249,8 @@ export function useUploadProgressPhoto() {
       if (!user) throw new Error('Not authenticated')
       return trackingService.uploadProgressPhoto(user.id, date, angle, file, weightKg)
     },
-    onSuccess: async (_photo, variables) => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['progress-photos'] })
-      if (user && variables.date === todayStr()) {
-        await awardDailyPoints(user.id, variables.date, {
-          gymCompleted: false,
-          steps: 0,
-          waterMl: 0,
-          waterGoalMl: 3000,
-          mealsLogged: 0,
-          sleepHours: null,
-          sleepGoalHours: 8,
-          weightLogged: false,
-          stretchingDone: false,
-          moodLogged: false,
-          photoLogged: true,
-        })
-      }
       toast.success('Photo uploaded!')
     },
   })

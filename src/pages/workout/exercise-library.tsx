@@ -1,33 +1,68 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Search, Dumbbell } from 'lucide-react'
+import { Search, Dumbbell, Flame } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { exerciseLibraryService } from '@/services/exercise-library.service'
 import type { EquipmentType } from '@/types/database.types'
+import { cn } from '@/lib/utils'
 
-const MUSCLES = ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core', 'Full Body', 'Hips']
+const MUSCLES = ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core', 'Full Body', 'Hips', 'Cardio']
 const EQUIPMENT: EquipmentType[] = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'band', 'other']
+const CATEGORIES = ['Cardio', 'HIIT', 'Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core', 'Full Body', 'Yoga', 'Mobility']
 
 export default function ExerciseLibraryPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [muscle, setMuscle] = useState('')
   const [equipment, setEquipment] = useState('')
+  const [category, setCategory] = useState('')
+  const [cardioOnly, setCardioOnly] = useState(false)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['exercise-library', search, muscle, equipment],
-    queryFn: () => exerciseLibraryService.search(search, { muscle: muscle || undefined, equipment: equipment || undefined }),
+    queryKey: ['exercise-library', search, muscle, equipment, category, cardioOnly],
+    queryFn: () =>
+      exerciseLibraryService.search(search, {
+        muscle: muscle || undefined,
+        equipment: equipment || undefined,
+        categories: cardioOnly ? ['Cardio', 'HIIT'] : undefined,
+        category: !cardioOnly ? category || undefined : undefined,
+      }),
   })
+
+  const toggleCardio = () => {
+    setCardioOnly((v) => !v)
+    setCategory('')
+  }
+
+  const selectCategory = (c: string) => {
+    setCardioOnly(false)
+    setCategory((prev) => (prev === c ? '' : c))
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Exercise Library</h1>
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant={!cardioOnly && !category ? 'gradient' : 'outline'} onClick={() => { setCardioOnly(false); setCategory('') }}>
+          All
+        </Button>
+        <Button type="button" size="sm" variant={cardioOnly ? 'gradient' : 'outline'} onClick={toggleCardio} className="gap-1.5">
+          <Flame className="size-3.5" /> Cardio &amp; HIIT (weight loss)
+        </Button>
+        {CATEGORIES.filter((c) => c !== 'Cardio' && c !== 'HIIT').map((c) => (
+          <Button key={c} type="button" size="sm" variant={!cardioOnly && category === c ? 'gradient' : 'outline'} onClick={() => selectCategory(c)}>
+            {c}
+          </Button>
+        ))}
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -68,7 +103,9 @@ export default function ExerciseLibraryPage() {
                   <Badge variant="outline">{ex.difficulty}</Badge>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Badge>{ex.target_muscle}</Badge>
+                  <Badge className={cn((ex.category === 'Cardio' || ex.category === 'HIIT') && 'gradient-fire border-0 text-white')}>
+                    {ex.category === 'HIIT' ? 'HIIT Cardio' : ex.category || ex.target_muscle}
+                  </Badge>
                   <Badge variant="secondary">{ex.equipment}</Badge>
                 </div>
                 {ex.instructions && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{ex.instructions}</p>}

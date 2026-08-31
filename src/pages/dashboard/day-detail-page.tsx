@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDayActivityLog } from '@/hooks/use-day-activity-log'
-import { formatDisplayDate } from '@/utils/date'
+import { formatDisplayDate, formatDurationHM } from '@/utils/date'
 import { format } from 'date-fns'
 
 const MOOD_EMOJI: Record<string, string> = {
@@ -76,11 +76,22 @@ export default function DayDetailPage() {
           ) : (
             <div className="space-y-4">
               {data.workoutSessions.map((session) => (
-                <div key={session.id} className="rounded-xl border border-border p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <button
+                  key={session.id}
+                  onClick={() => navigate(`/workout/log/${session.id}`)}
+                  className="w-full text-left rounded-xl border border-border p-4 hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1">
                     <p className="font-semibold">{session.title || session.workout_types.join(', ')}</p>
-                    <span className="text-sm text-muted-foreground">{session.duration_minutes ? `${Math.round(session.duration_minutes)} min` : ''}</span>
+                    <span className="text-sm text-muted-foreground">{formatDurationHM(session.duration_minutes)}</span>
                   </div>
+                  {(session.gym_entry_time || session.gym_exit_time) && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {session.gym_entry_time ? format(new Date(session.gym_entry_time), 'h:mm a') : '—'}
+                      {' → '}
+                      {session.gym_exit_time ? format(new Date(session.gym_exit_time), 'h:mm a') : '—'}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1 mb-2">
                     {session.workout_types.map((t) => (
                       <Badge key={t} variant="outline">
@@ -94,25 +105,15 @@ export default function DayDetailPage() {
                         <div key={ex.id} className="flex justify-between text-sm text-muted-foreground">
                           <span>{ex.exercise_name}</span>
                           <span>
-                            {ex.weight_kg}kg × {ex.sets}×{ex.reps}
+                            {ex.duration_seconds
+                              ? `${ex.duration_seconds}s × ${ex.sets} sets`
+                              : `${ex.weight_kg ? `${ex.weight_kg}kg × ` : ''}${ex.sets}×${ex.reps}`}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
-                  {session.cardioSessions.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {session.cardioSessions.map((c) => (
-                        <div key={c.id} className="flex justify-between text-sm text-muted-foreground">
-                          <span>{c.machine_type ?? c.outdoor_type}</span>
-                          <span>
-                            {c.duration_minutes}min {c.distance_km ? `• ${c.distance_km}km` : ''}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                </button>
               ))}
             </div>
           )}

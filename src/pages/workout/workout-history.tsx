@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useWorkoutHistory } from '@/hooks/use-workout'
 import { format, parseISO } from 'date-fns'
+import { formatDurationHM } from '@/utils/date'
 
 export default function WorkoutHistoryPage() {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export default function WorkoutHistoryPage() {
       ) : sessions && sessions.length > 0 ? (
         <div className="space-y-2">
           {sessions.map((session) => (
-            <Card key={session.id} className="card-hover cursor-pointer" onClick={() => navigate(`/calendar/${session.date}`)}>
+            <Card key={session.id} className="card-hover cursor-pointer" onClick={() => navigate(`/workout/log/${session.id}`)}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-sm">{session.title || 'Workout Session'}</p>
@@ -43,9 +44,7 @@ export default function WorkoutHistoryPage() {
                     ))}
                   </div>
                 </div>
-                <span className="text-sm text-muted-foreground shrink-0">
-                  {session.duration_minutes ? `${Math.round(session.duration_minutes)} min` : '—'}
-                </span>
+                <span className="text-sm text-muted-foreground shrink-0">{formatDurationHM(session.duration_minutes)}</span>
               </CardContent>
             </Card>
           ))}

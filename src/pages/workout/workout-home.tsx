@@ -1,57 +1,17 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import {
-  Dumbbell,
-  Bike,
-  Waves,
-  Zap,
-  StretchHorizontal,
-  Move,
-  Flower2,
-  Play,
-  ClipboardList,
-  BookOpen,
-  History,
-} from 'lucide-react'
+import { Plus, ClipboardList, BookOpen, History, PencilLine } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { useActiveWorkoutStore } from '@/stores/active-workout.store'
-import { useStartWorkout, useWorkoutHistory } from '@/hooks/use-workout'
-import type { WorkoutType } from '@/types/database.types'
+import { Badge } from '@/components/ui/badge'
+import { useWorkoutHistory } from '@/hooks/use-workout'
 import { format, parseISO } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
-
-const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: typeof Dumbbell; gradient: string }[] = [
-  { type: 'strength', label: 'Strength Training', icon: Dumbbell, gradient: 'gradient-primary' },
-  { type: 'machine_cardio', label: 'Machine Cardio', icon: Bike, gradient: 'gradient-accent' },
-  { type: 'outdoor_cardio', label: 'Outdoor Cardio', icon: Waves, gradient: 'bg-gradient-to-br from-cyan-400 to-blue-500' },
-  { type: 'functional', label: 'Functional', icon: Move, gradient: 'gradient-secondary' },
-  { type: 'hiit', label: 'HIIT', icon: Zap, gradient: 'gradient-fire' },
-  { type: 'stretching', label: 'Stretching', icon: StretchHorizontal, gradient: 'bg-gradient-to-br from-teal-400 to-emerald-500' },
-  { type: 'mobility', label: 'Mobility', icon: Move, gradient: 'bg-gradient-to-br from-indigo-400 to-purple-500' },
-  { type: 'yoga', label: 'Yoga', icon: Flower2, gradient: 'bg-gradient-to-br from-pink-400 to-rose-500' },
-]
+import { formatDurationHM } from '@/utils/date'
+import { DailyHiitSuggestionCard } from '@/components/workout/daily-hiit-suggestion-card'
 
 export default function WorkoutHomePage() {
   const navigate = useNavigate()
-  const [selectedTypes, setSelectedTypes] = useState<WorkoutType[]>([])
-  const startWorkout = useStartWorkout()
-  const activeWorkoutStore = useActiveWorkoutStore()
   const { data: history, isLoading: historyLoading } = useWorkoutHistory(5)
-
-  const toggleType = (type: WorkoutType) => {
-    setSelectedTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
-  }
-
-  const handleStart = async () => {
-    if (selectedTypes.length === 0) return
-    const session = await startWorkout.mutateAsync({ types: selectedTypes })
-    activeWorkoutStore.startWorkout(selectedTypes)
-    activeWorkoutStore.setSessionId(session.id)
-    navigate('/workout/active')
-  }
 
   return (
     <div className="space-y-6">
@@ -67,43 +27,20 @@ export default function WorkoutHomePage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>What are you training today?</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {WORKOUT_TYPES.map((wt, i) => {
-              const selected = selectedTypes.includes(wt.type)
-              return (
-                <motion.button
-                  key={wt.type}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  onClick={() => toggleType(wt.type)}
-                  className={cn(
-                    'flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all',
-                    selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
-                  )}
-                >
-                  <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl', wt.gradient)}>
-                    <wt.icon className="size-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-center">{wt.label}</span>
-                </motion.button>
-              )
-            })}
-          </div>
+      <DailyHiitSuggestionCard />
 
-          <Button
-            variant="gradient"
-            size="lg"
-            className="w-full mt-6"
-            disabled={selectedTypes.length === 0 || startWorkout.isPending}
-            onClick={handleStart}
-          >
-            <Play className="size-5" /> Start Workout
+      <Card>
+        <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold flex items-center gap-2">
+              <PencilLine className="size-4 text-primary" /> Log a gym session
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Enter your entry &amp; exit time and we'll calculate the duration. Add exercises with sets, reps, weight, or timing.
+            </p>
+          </div>
+          <Button variant="gradient" size="lg" onClick={() => navigate('/workout/log')} className="shrink-0">
+            <Plus className="size-5" /> Log Workout
           </Button>
         </CardContent>
       </Card>
@@ -125,18 +62,27 @@ export default function WorkoutHomePage() {
             </>
           ) : history && history.length > 0 ? (
             history.map((session) => (
-              <div key={session.id} className="flex items-center justify-between rounded-xl bg-muted/40 p-3">
+              <button
+                key={session.id}
+                onClick={() => navigate(`/workout/log/${session.id}`)}
+                className="w-full flex items-center justify-between rounded-xl bg-muted/40 p-3 hover:bg-muted transition-colors text-left"
+              >
                 <div>
                   <p className="font-medium text-sm">{session.title || session.workout_types.join(', ').replace(/_/g, ' ')}</p>
-                  <p className="text-xs text-muted-foreground">{format(parseISO(session.date), 'MMM d, yyyy')}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">{format(parseISO(session.date), 'MMM d, yyyy')}</p>
+                    {session.workout_types.slice(0, 2).map((t) => (
+                      <Badge key={t} variant="outline" className="text-[10px]">
+                        {t.replace(/_/g, ' ')}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {session.duration_minutes ? `${Math.round(session.duration_minutes)} min` : 'In progress'}
-                </span>
-              </div>
+                <span className="text-sm text-muted-foreground shrink-0">{formatDurationHM(session.duration_minutes)}</span>
+              </button>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">No workouts logged yet. Start your first one above!</p>
+            <p className="text-sm text-muted-foreground text-center py-6">No workouts logged yet. Log your first one above!</p>
           )}
         </CardContent>
       </Card>

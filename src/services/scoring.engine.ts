@@ -62,38 +62,25 @@ export interface PointsAwardResult {
 }
 
 /**
- * Awards points for a completed day based on the same inputs used for the
- * health score, plus special bonus conditions (early workout, long workout,
- * no sugary drinks). Persists each entry to the points ledger.
+ * Awards points for a completed day. By design, points are only awarded
+ * for two things: completing a gym workout, and hitting 10,000 steps.
+ * (A 5-day gym streak bonus is awarded separately via updateStreak.)
+ * Everything else the user tracks (water, food, sleep, weight, photos,
+ * mood, etc.) is still logged normally, it just doesn't earn points.
  */
 export async function awardDailyPoints(
   userId: string,
   date: string,
-  inputs: DayInputsForScoring & {
-    workoutMinutes?: number
-    workoutStartHour?: number | null
-    noSugaryDrinks?: boolean
-  }
+  inputs: { gymCompleted: boolean; steps: number }
 ): Promise<PointsAwardResult> {
   const breakdown: { reason: string; points: number }[] = []
 
-  if (inputs.gymCompleted) breakdown.push({ reason: 'gym_completed', points: POINTS.GYM_COMPLETED })
-
-  if (inputs.steps >= 20000) breakdown.push({ reason: 'steps_20k', points: POINTS.STEPS_20K })
-  else if (inputs.steps >= 15000) breakdown.push({ reason: 'steps_15k', points: POINTS.STEPS_15K })
-  else if (inputs.steps >= 10000) breakdown.push({ reason: 'steps_10k', points: POINTS.STEPS_10K })
-
-  if (inputs.waterMl >= inputs.waterGoalMl) breakdown.push({ reason: 'water_goal', points: POINTS.WATER_GOAL })
-  if (inputs.mealsLogged > 0) breakdown.push({ reason: 'food_logged', points: POINTS.FOOD_LOGGED })
-  if (inputs.sleepHours !== null && inputs.sleepHours >= inputs.sleepGoalHours)
-    breakdown.push({ reason: 'sleep_goal', points: POINTS.SLEEP_GOAL })
-  if (inputs.weightLogged) breakdown.push({ reason: 'weight_logged', points: POINTS.WEIGHT_LOGGED })
-  if (inputs.photoLogged) breakdown.push({ reason: 'progress_photo', points: POINTS.PROGRESS_PHOTO })
-  if (inputs.workoutMinutes && inputs.workoutMinutes > 90)
-    breakdown.push({ reason: 'workout_over_90min', points: POINTS.WORKOUT_OVER_90MIN })
-  if (inputs.workoutStartHour !== null && inputs.workoutStartHour !== undefined && inputs.workoutStartHour < 8)
-    breakdown.push({ reason: 'workout_before_8am', points: POINTS.WORKOUT_BEFORE_8AM })
-  if (inputs.noSugaryDrinks) breakdown.push({ reason: 'no_sugary_drinks', points: POINTS.NO_SUGARY_DRINKS })
+  if (inputs.gymCompleted && !(await gamificationService.hasPointsForReason(userId, date, 'gym_completed'))) {
+    breakdown.push({ reason: 'gym_completed', points: POINTS.GYM_COMPLETED })
+  }
+  if (inputs.steps >= 10000 && !(await gamificationService.hasPointsForReason(userId, date, 'steps_10k'))) {
+    breakdown.push({ reason: 'steps_10k', points: POINTS.STEPS_10K })
+  }
 
   for (const entry of breakdown) {
     await gamificationService.addPoints(userId, date, entry.points, entry.reason)
@@ -109,8 +96,9 @@ export async function awardDailyPoints(
 
 /**
  * Updates a streak category after an activity is logged for `date`.
- * Handles consecutive-day detection, longest-streak tracking, and
- * awards milestone bonus points/XP when hit.
+ * Handles consecutive-day detection and longest-streak tracking.
+ * Only the 'gym' category awards a milestone bonus (5-day streak = 150 pts);
+ * other categories (water, sleep, food, weight) are tracked for display only.
  */
 export async function updateStreak(userId: string, category: StreakCategory, date: string): Promise<{ streak: number; bonusAwarded: number }> {
   const existing = await gamificationService.getStreak(userId, category)
@@ -137,7 +125,7 @@ export async function updateStreak(userId: string, category: StreakCategory, dat
     last_logged_date: date,
   })
 
-  const bonus = getStreakMilestoneBonus(newStreak)
+  const bonus = category === 'gym' ? getStreakMilestoneBonus(newStreak) : 0
   if (bonus > 0) {
     await gamificationService.addPoints(userId, date, bonus, `streak_${newStreak}_days_${category}`)
     await gamificationService.addXp(userId, bonus)

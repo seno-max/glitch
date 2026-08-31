@@ -20,7 +20,7 @@ const CalendarPage = lazy(() => import('@/pages/dashboard/calendar-page'))
 const DayDetailPage = lazy(() => import('@/pages/dashboard/day-detail-page'))
 
 const WorkoutHomePage = lazy(() => import('@/pages/workout/workout-home'))
-const ActiveWorkoutPage = lazy(() => import('@/pages/workout/active-workout'))
+const WorkoutLogPage = lazy(() => import('@/pages/workout/workout-log'))
 const WorkoutTemplatesPage = lazy(() => import('@/pages/workout/templates'))
 const ExerciseLibraryPage = lazy(() => import('@/pages/workout/exercise-library'))
 const ExerciseHistoryPage = lazy(() => import('@/pages/workout/exercise-history'))
@@ -95,7 +95,8 @@ function App() {
                 <Route path="/calendar/:date" element={<DayDetailPage />} />
 
                 <Route path="/workout" element={<WorkoutHomePage />} />
-                <Route path="/workout/active" element={<ActiveWorkoutPage />} />
+                <Route path="/workout/log" element={<WorkoutLogPage />} />
+                <Route path="/workout/log/:sessionId" element={<WorkoutLogPage />} />
                 <Route path="/workout/templates" element={<WorkoutTemplatesPage />} />
                 <Route path="/workout/exercises" element={<ExerciseLibraryPage />} />
                 <Route path="/workout/exercises/:name" element={<ExerciseHistoryPage />} />

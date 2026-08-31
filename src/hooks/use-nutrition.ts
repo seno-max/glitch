@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth.store'
 import { nutritionService } from '@/services/nutrition.service'
-import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
+import { updateStreak } from '@/services/scoring.engine'
 import type { Meal, MealType } from '@/types/database.types'
-import { todayStr } from '@/utils/date'
 import toast from 'react-hot-toast'
 
 export function useMealsForDate(date: string) {
@@ -29,21 +28,6 @@ export function useAddMeal() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       if (user) {
         await updateStreak(user.id, 'food_logging', meal.date)
-        if (meal.date === todayStr()) {
-          await awardDailyPoints(user.id, meal.date, {
-            gymCompleted: false,
-            steps: 0,
-            waterMl: 0,
-            waterGoalMl: 3000,
-            mealsLogged: 1,
-            sleepHours: null,
-            sleepGoalHours: 8,
-            weightLogged: false,
-            stretchingDone: false,
-            moodLogged: false,
-            photoLogged: false,
-          })
-        }
       }
       toast.success('Meal logged!')
     },

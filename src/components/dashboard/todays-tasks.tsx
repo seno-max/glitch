@@ -49,7 +49,7 @@ export function TodaysTasks({ tasks }: { tasks: TaskItem[] }) {
               <span className={cn('flex-1 text-sm font-medium', task.completed && 'line-through text-muted-foreground')}>
                 {task.label}
               </span>
-              <span className="text-xs font-semibold text-primary">+{task.points}</span>
+              {task.points ? <span className="text-xs font-semibold text-primary">+{task.points}</span> : null}
               <ChevronRight className="size-4 text-muted-foreground" />
             </motion.button>
           )

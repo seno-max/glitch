@@ -27,19 +27,14 @@ export default function NutritionPage() {
   const addMeal = useAddMeal()
   const deleteMeal = useDeleteMeal()
   const [dialogMealType, setDialogMealType] = useState<MealType | null>(null)
-  const [form, setForm] = useState({ name: '', quantity: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '' })
+  const [form, setForm] = useState({ name: '', quantity: '', calories: '' })
 
   const totals = (meals ?? []).reduce(
-    (acc, m) => ({
-      calories: acc.calories + (m.calories ?? 0),
-      protein: acc.protein + (m.protein_g ?? 0),
-      carbs: acc.carbs + (m.carbs_g ?? 0),
-      fat: acc.fat + (m.fat_g ?? 0),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    (acc, m) => ({ calories: acc.calories + (m.calories ?? 0) }),
+    { calories: 0 }
   )
 
-  const resetForm = () => setForm({ name: '', quantity: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '' })
+  const resetForm = () => setForm({ name: '', quantity: '', calories: '' })
 
   const handleAdd = async () => {
     if (!dialogMealType || !form.name.trim()) return
@@ -50,11 +45,11 @@ export default function NutritionPage() {
       food_name: form.name,
       quantity: form.quantity || null,
       calories: form.calories ? Number(form.calories) : null,
-      protein_g: form.protein ? Number(form.protein) : null,
-      carbs_g: form.carbs ? Number(form.carbs) : null,
-      fat_g: form.fat ? Number(form.fat) : null,
-      fiber_g: form.fiber ? Number(form.fiber) : null,
-      sugar_g: form.sugar ? Number(form.sugar) : null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      fiber_g: null,
+      sugar_g: null,
       notes: null,
       logged_at: new Date().toISOString(),
     })
@@ -70,23 +65,10 @@ export default function NutritionPage() {
       </div>
 
       <Card className="gradient-hero text-white">
-        <CardContent className="p-6 grid grid-cols-4 gap-4">
-          <div>
-            <p className="text-white/50 text-xs mb-1">Calories</p>
-            <p className="text-xl font-bold">{Math.round(totals.calories)}</p>
-          </div>
-          <div>
-            <p className="text-white/50 text-xs mb-1">Protein</p>
-            <p className="text-xl font-bold">{Math.round(totals.protein)}g</p>
-          </div>
-          <div>
-            <p className="text-white/50 text-xs mb-1">Carbs</p>
-            <p className="text-xl font-bold">{Math.round(totals.carbs)}g</p>
-          </div>
-          <div>
-            <p className="text-white/50 text-xs mb-1">Fat</p>
-            <p className="text-xl font-bold">{Math.round(totals.fat)}g</p>
-          </div>
+        <CardContent className="p-6">
+          <p className="text-white/50 text-xs mb-1">Calories Today</p>
+          <p className="text-3xl font-bold">{Math.round(totals.calories)}</p>
+          <p className="text-white/50 text-xs mt-1">Just log what you eat — no need to track protein/carbs/fat.</p>
         </CardContent>
       </Card>
 
@@ -141,14 +123,7 @@ export default function NutritionPage() {
           <DialogBody className="space-y-3">
             <Input placeholder="Food name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Quantity (e.g. 200g, 1 cup)" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
-            <div className="grid grid-cols-2 gap-2">
-              <Input type="number" placeholder="Calories" value={form.calories} onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))} />
-              <Input type="number" placeholder="Protein (g)" value={form.protein} onChange={(e) => setForm((f) => ({ ...f, protein: e.target.value }))} />
-              <Input type="number" placeholder="Carbs (g)" value={form.carbs} onChange={(e) => setForm((f) => ({ ...f, carbs: e.target.value }))} />
-              <Input type="number" placeholder="Fat (g)" value={form.fat} onChange={(e) => setForm((f) => ({ ...f, fat: e.target.value }))} />
-              <Input type="number" placeholder="Fiber (g)" value={form.fiber} onChange={(e) => setForm((f) => ({ ...f, fiber: e.target.value }))} />
-              <Input type="number" placeholder="Sugar (g)" value={form.sugar} onChange={(e) => setForm((f) => ({ ...f, sugar: e.target.value }))} />
-            </div>
+            <Input type="number" placeholder="Calories (optional)" value={form.calories} onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))} />
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogMealType(null)}>

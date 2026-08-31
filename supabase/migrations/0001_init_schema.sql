@@ -10,7 +10,8 @@
 --    updated_at maintenance via trigger.
 -- ============================================================================
 
-create extension if not exists "uuid-ossp";
+-- gen_random_uuid() is built into Postgres 13+ (pg_catalog), no extension needed.
+-- pgcrypto kept for any crypto helper functions used elsewhere.
 create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
@@ -104,7 +105,7 @@ create type equipment_type as enum ('machine', 'dumbbell', 'barbell', 'cable', '
 create type difficulty_type as enum ('beginner', 'intermediate', 'advanced');
 
 create table public.exercise_library (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   target_muscle text not null,
   secondary_muscles text[] default '{}',
@@ -128,7 +129,7 @@ create trigger trg_exercise_library_updated_at before update on public.exercise_
 -- 4. WORKOUT TEMPLATES
 -- ============================================================================
 create table public.workout_templates (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   category text, -- Chest / Push / Pull / Upper / Lower / Full Body / Custom
@@ -142,7 +143,7 @@ create trigger trg_workout_templates_updated_at before update on public.workout_
   for each row execute function public.set_updated_at();
 
 create table public.workout_template_exercises (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.workout_templates(id) on delete cascade,
   exercise_id uuid references public.exercise_library(id) on delete set null,
   exercise_name text not null, -- denormalized for custom entries
@@ -162,7 +163,7 @@ create type workout_type as enum (
 );
 
 create table public.workout_sessions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   gym_entry_time timestamptz,
@@ -198,7 +199,7 @@ create trigger trg_calc_workout_duration before insert or update on public.worko
 -- 6. STRENGTH EXERCISES (logged sets within a session)
 -- ============================================================================
 create table public.strength_exercises (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.workout_sessions(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   exercise_id uuid references public.exercise_library(id) on delete set null,
@@ -245,7 +246,7 @@ create type outdoor_activity_type as enum (
 create type cardio_mode as enum ('machine', 'outdoor');
 
 create table public.cardio_sessions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.workout_sessions(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   mode cardio_mode not null default 'machine',
@@ -285,7 +286,7 @@ create type meal_type as enum (
 );
 
 create table public.foods (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade, -- null = global/shared food
   name text not null,
   default_quantity text,
@@ -305,7 +306,7 @@ create trigger trg_foods_updated_at before update on public.foods
   for each row execute function public.set_updated_at();
 
 create table public.meal_templates (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   meal_type meal_type not null,
@@ -316,7 +317,7 @@ create table public.meal_templates (
 create index idx_meal_templates_user on public.meal_templates (user_id);
 
 create table public.meals (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   meal_type meal_type not null,
@@ -342,7 +343,7 @@ create trigger trg_meals_updated_at before update on public.meals
 -- 9. WATER LOGS
 -- ============================================================================
 create table public.water_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   amount_ml int not null,
@@ -355,7 +356,7 @@ create index idx_water_logs_user_date on public.water_logs (user_id, date);
 -- 10. WEIGHT LOGS
 -- ============================================================================
 create table public.weight_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   weight_kg numeric(5,2) not null,
@@ -377,7 +378,7 @@ create trigger trg_weight_logs_updated_at before update on public.weight_logs
 -- 11. BODY MEASUREMENTS
 -- ============================================================================
 create table public.body_measurements (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   neck_cm numeric(5,2),
@@ -407,7 +408,7 @@ create trigger trg_body_measurements_updated_at before update on public.body_mea
 create type photo_angle_type as enum ('front', 'side', 'back');
 
 create table public.progress_photos (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   angle photo_angle_type not null,
@@ -424,7 +425,7 @@ create index idx_progress_photos_user_date on public.progress_photos (user_id, d
 create type sleep_quality_type as enum ('excellent', 'good', 'average', 'poor', 'very_poor');
 
 create table public.sleep_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null, -- the day woken up on
   sleep_time timestamptz,
@@ -459,7 +460,7 @@ create trigger trg_calc_sleep_hours before insert or update on public.sleep_logs
 create type mood_type as enum ('excellent', 'good', 'average', 'bad', 'very_bad');
 
 create table public.mood_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   mood mood_type not null,
@@ -477,7 +478,7 @@ create trigger trg_mood_logs_updated_at before update on public.mood_logs
 -- 15. STEP LOGS
 -- ============================================================================
 create table public.step_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   steps int not null default 0,
@@ -494,7 +495,7 @@ create trigger trg_step_logs_updated_at before update on public.step_logs
 -- 16. DAILY ROUTINE (wake/sleep/gym summary/notes container per day)
 -- ============================================================================
 create table public.daily_routines (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   wake_up_time timestamptz,
@@ -512,7 +513,7 @@ create trigger trg_daily_routines_updated_at before update on public.daily_routi
 -- 17. DAILY SCORES (health score breakdown, per day)
 -- ============================================================================
 create table public.daily_scores (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   gym_score int not null default 0,
@@ -537,7 +538,7 @@ create trigger trg_daily_scores_updated_at before update on public.daily_scores
 -- 18. POINTS LEDGER (XP / points transactions)
 -- ============================================================================
 create table public.points_ledger (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   points int not null,
@@ -553,7 +554,7 @@ create index idx_points_ledger_user_date on public.points_ledger (user_id, date)
 create type streak_category_type as enum ('gym', 'steps', 'water', 'food_logging', 'weight_logging', 'sleep');
 
 create table public.streaks (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   category streak_category_type not null,
   current_streak int not null default 0,
@@ -570,7 +571,7 @@ create trigger trg_streaks_updated_at before update on public.streaks
 -- 20. ACHIEVEMENTS (badge catalog + user unlocks)
 -- ============================================================================
 create table public.achievement_catalog (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   code text unique not null, -- e.g. 'first_workout', '100_workouts'
   name text not null,
   description text,
@@ -581,7 +582,7 @@ create table public.achievement_catalog (
 );
 
 create table public.user_achievements (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   achievement_code text not null references public.achievement_catalog(code) on delete cascade,
   unlocked_at timestamptz not null default now(),
@@ -600,7 +601,7 @@ create type pr_category_type as enum (
 );
 
 create table public.personal_records (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   category pr_category_type not null,
   value numeric(12,3) not null,
@@ -622,7 +623,7 @@ create type challenge_metric_type as enum (
 );
 
 create table public.challenges (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   description text,
@@ -651,7 +652,7 @@ create type notification_type as enum (
 );
 
 create table public.notifications (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   type notification_type not null,
   title text not null,

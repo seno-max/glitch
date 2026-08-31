@@ -64,6 +64,19 @@ export const gamificationService = {
     return (data ?? []).reduce((sum: number, r: { points: number }) => sum + r.points, 0)
   },
 
+  async hasPointsForReason(userId: string, date: string, reason: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('points_ledger')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .eq('reason', reason)
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return !!data
+  },
+
   async getPointsInRange(userId: string, startDate: string, endDate: string): Promise<PointsLedgerEntry[]> {
     const { data, error } = await supabase
       .from('points_ledger')

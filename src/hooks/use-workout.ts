@@ -4,7 +4,8 @@ import { workoutService } from '@/services/workout.service'
 import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
 import { gamificationService } from '@/services/gamification.service'
 import { todayStr } from '@/utils/date'
-import type { WorkoutType, StrengthExercise, CardioSession } from '@/types/database.types'
+import type { WorkoutType, StrengthExercise } from '@/types/database.types'
+import type { DraftExercise } from '@/stores/workout-log.store'
 import toast from 'react-hot-toast'
 
 export function useWorkoutHistory(limit = 20) {
@@ -21,75 +22,141 @@ export function useWorkoutHistory(limit = 20) {
   })
 }
 
-export function useStartWorkout() {
-  const { user } = useAuthStore()
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ types, title }: { types: WorkoutType[]; title?: string }) => {
-      if (!user) throw new Error('Not authenticated')
-      return workoutService.startSession(user.id, types, title)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workout-history'] })
+/**
+ * Loads a single workout session plus its logged exercises, keyed by
+ * session id. Used to prefill the manual log editor when re-opening a
+ * previously logged workout (e.g. from the calendar day-detail page).
+ */
+export function useWorkoutSessionDetail(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-session-detail', sessionId],
+    enabled: !!sessionId,
+    queryFn: async () => {
+      const [session, exercises] = await Promise.all([
+        workoutService.getSessionById(sessionId!),
+        workoutService.getStrengthExercisesBySession(sessionId!),
+      ])
+      return { session, exercises }
     },
   })
 }
 
-export function useEndWorkout() {
+interface SaveWorkoutLogInput {
+  sessionId?: string // present when editing an existing log
+  date: string
+  entryTime: string // "HH:mm"
+  exitTime: string // "HH:mm"
+  workoutTypes: WorkoutType[]
+  title: string
+  exercises: DraftExercise[]
+}
+
+/**
+ * Saves (creates or updates) a manually-logged workout: a gym entry/exit
+ * time pair (duration auto-calculated by the DB trigger) plus a list of
+ * exercises (strength and/or timed cardio-style). Awards gym-completion
+ * points + updates the gym streak, same as before, but without any live
+ * timer flow.
+ */
+export function useSaveWorkoutLog() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const session = await workoutService.endSession(sessionId)
+    mutationFn: async (input: SaveWorkoutLogInput) => {
+      if (!user) throw new Error('Not authenticated')
+      const gymEntryTime = new Date(`${input.date}T${input.entryTime}:00`).toISOString()
+      let exitDate = input.date
+      // If exit time is earlier than entry time, assume it rolled past midnight.
+      if (input.exitTime < input.entryTime) {
+        const next = new Date(`${input.date}T00:00:00`)
+        next.setDate(next.getDate() + 1)
+        exitDate = next.toISOString().slice(0, 10)
+      }
+      const gymExitTime = new Date(`${exitDate}T${input.exitTime}:00`).toISOString()
 
-      if (user) {
-        const date = session.date
-        const hour = session.gym_entry_time ? new Date(session.gym_entry_time).getHours() : null
-        await updateStreak(user.id, 'gym', date)
-        await awardDailyPoints(user.id, date, {
-          gymCompleted: true,
-          steps: 0,
-          waterMl: 0,
-          waterGoalMl: 3000,
-          mealsLogged: 0,
-          sleepHours: null,
-          sleepGoalHours: 8,
-          weightLogged: false,
-          stretchingDone: false,
-          moodLogged: false,
-          photoLogged: false,
-          workoutMinutes: session.duration_minutes ?? undefined,
-          workoutStartHour: hour,
+      const session = input.sessionId
+        ? await workoutService.updateSessionTimes(input.sessionId, {
+            date: input.date,
+            gymEntryTime,
+            gymExitTime,
+            workoutTypes: input.workoutTypes,
+            title: input.title || null,
+          })
+        : await workoutService.createSession({
+            userId: user.id,
+            date: input.date,
+            gymEntryTime,
+            gymExitTime,
+            workoutTypes: input.workoutTypes,
+            title: input.title || null,
+          })
+
+      // Replace exercises: delete existing (if editing) then re-insert.
+      if (input.sessionId) {
+        const existing = await workoutService.getStrengthExercisesBySession(input.sessionId)
+        await Promise.all(existing.map((e) => workoutService.deleteStrengthExercise(e.id)))
+      }
+
+      const savedExercises: StrengthExercise[] = []
+      for (let i = 0; i < input.exercises.length; i++) {
+        const ex = input.exercises[i]
+        const saved = await workoutService.addStrengthExercise({
+          session_id: session.id,
+          user_id: user.id,
+          exercise_id: null,
+          exercise_name: ex.exercise_name,
+          equipment: ex.equipment,
+          weight_kg: ex.weight_kg ?? 0,
+          sets: ex.sets,
+          reps: ex.reps ?? 0,
+          rest_seconds: ex.rest_seconds,
+          rpe: ex.rpe,
+          duration_seconds: ex.duration_seconds,
+          notes: ex.notes,
+          order_index: i,
+          performed_at: gymEntryTime,
         })
+        savedExercises.push(saved)
+      }
+
+      await updateStreak(user.id, 'gym', input.date)
+      await awardDailyPoints(user.id, input.date, { gymCompleted: true, steps: 0 })
+
+      for (const ex of savedExercises) {
+        await checkStrengthPR(ex)
       }
 
       return session
     },
     onSuccess: () => {
-      toast.success('Workout completed! 💪')
+      toast.success('Workout saved! 💪')
+      queryClient.invalidateQueries({ queryKey: ['workout-history'] })
+      queryClient.invalidateQueries({ queryKey: ['workout-session-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+    },
+  })
+}
+
+export function useDeleteWorkoutSession() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => workoutService.deleteSession(sessionId),
+    onSuccess: () => {
+      toast.success('Workout deleted')
       queryClient.invalidateQueries({ queryKey: ['workout-history'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
     },
   })
 }
 
-export function useAddStrengthExercise() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: Omit<StrengthExercise, 'id' | 'created_at' | 'updated_at' | 'volume_kg'>) =>
-      workoutService.addStrengthExercise(payload),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['strength-exercises', variables.session_id] })
-      checkStrengthPR(variables)
-    },
-  })
-}
-
-async function checkStrengthPR(ex: Omit<StrengthExercise, 'id' | 'created_at' | 'updated_at' | 'volume_kg'>) {
+async function checkStrengthPR(ex: StrengthExercise) {
   try {
+    if (!ex.weight_kg) return
     const best = await gamificationService.getBestPersonalRecord(ex.user_id, 'highest_weight')
     if (!best || ex.weight_kg > best.value) {
       await gamificationService.recordPersonalRecord({
@@ -106,16 +173,6 @@ async function checkStrengthPR(ex: Omit<StrengthExercise, 'id' | 'created_at' | 
   } catch {
     // Non-critical, ignore
   }
-}
-
-export function useAddCardioSession() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: Omit<CardioSession, 'id' | 'created_at' | 'updated_at'>) => workoutService.addCardioSession(payload),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['cardio-sessions', variables.session_id] })
-    },
-  })
 }
 
 export function useExerciseHistory(exerciseName: string) {

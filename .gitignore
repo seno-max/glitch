@@ -34,3 +34,4 @@ capacitor.config.json.bak
 *.njsproj
 *.sln
 *.sw?
+.temp/

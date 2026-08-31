@@ -58,3 +58,17 @@ export function isConsecutiveDay(prevDateStr: string | null, currentDateStr: str
 export function isSameOrBeforeToday(dateStr: string): boolean {
   return dateStr <= todayStr()
 }
+
+/**
+ * Formats a duration given in minutes as a friendly "1 hr 36 mins" style string.
+ * Used for the manual gym-log entry/exit time workflow.
+ */
+export function formatDurationHM(totalMinutes: number | null | undefined): string {
+  if (totalMinutes === null || totalMinutes === undefined || Number.isNaN(totalMinutes)) return '—'
+  const rounded = Math.max(0, Math.round(totalMinutes))
+  const h = Math.floor(rounded / 60)
+  const m = rounded % 60
+  if (h > 0 && m > 0) return `${h} hr ${m} min${m === 1 ? '' : 's'}`
+  if (h > 0) return `${h} hr`
+  return `${m} min${m === 1 ? '' : 's'}`
+}
