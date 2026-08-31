@@ -1,0 +1,19 @@
+{
+  "name": "FitTrack — Fitness & Daily Routine Tracker",
+  "short_name": "FitTrack",
+  "description": "Track workouts, nutrition, water, sleep, weight, mood and daily routines. Earn XP, keep streaks, and level up your fitness journey.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

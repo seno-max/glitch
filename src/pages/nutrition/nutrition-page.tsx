@@ -1,0 +1,165 @@
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { Plus, Trash2, Star, Coffee, Sun, Cookie, Moon, GlassWater, Milk, Pill, Sandwich } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import { useMealsForDate, useAddMeal, useDeleteMeal } from '@/hooks/use-nutrition'
+import { todayStr, formatDisplayDate } from '@/utils/date'
+import type { MealType } from '@/types/database.types'
+
+const MEAL_SECTIONS: { type: MealType; label: string; icon: typeof Coffee }[] = [
+  { type: 'breakfast', label: 'Breakfast', icon: Coffee },
+  { type: 'lunch', label: 'Lunch', icon: Sun },
+  { type: 'evening_snack', label: 'Evening Snack', icon: Cookie },
+  { type: 'dinner', label: 'Dinner', icon: Moon },
+  { type: 'beverage', label: 'Beverages', icon: GlassWater },
+  { type: 'protein_shake', label: 'Protein Shake', icon: Milk },
+  { type: 'supplement', label: 'Supplements', icon: Pill },
+  { type: 'late_night_snack', label: 'Late Night Snack', icon: Sandwich },
+]
+
+export default function NutritionPage() {
+  const date = todayStr()
+  const { data: meals, isLoading } = useMealsForDate(date)
+  const addMeal = useAddMeal()
+  const deleteMeal = useDeleteMeal()
+  const [dialogMealType, setDialogMealType] = useState<MealType | null>(null)
+  const [form, setForm] = useState({ name: '', quantity: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '' })
+
+  const totals = (meals ?? []).reduce(
+    (acc, m) => ({
+      calories: acc.calories + (m.calories ?? 0),
+      protein: acc.protein + (m.protein_g ?? 0),
+      carbs: acc.carbs + (m.carbs_g ?? 0),
+      fat: acc.fat + (m.fat_g ?? 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  )
+
+  const resetForm = () => setForm({ name: '', quantity: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '' })
+
+  const handleAdd = async () => {
+    if (!dialogMealType || !form.name.trim()) return
+    await addMeal.mutateAsync({
+      date,
+      meal_type: dialogMealType,
+      food_id: null,
+      food_name: form.name,
+      quantity: form.quantity || null,
+      calories: form.calories ? Number(form.calories) : null,
+      protein_g: form.protein ? Number(form.protein) : null,
+      carbs_g: form.carbs ? Number(form.carbs) : null,
+      fat_g: form.fat ? Number(form.fat) : null,
+      fiber_g: form.fiber ? Number(form.fiber) : null,
+      sugar_g: form.sugar ? Number(form.sugar) : null,
+      notes: null,
+      logged_at: new Date().toISOString(),
+    })
+    resetForm()
+    setDialogMealType(null)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Nutrition</h1>
+        <p className="text-sm text-muted-foreground">{formatDisplayDate(date)}</p>
+      </div>
+
+      <Card className="gradient-hero text-white">
+        <CardContent className="p-6 grid grid-cols-4 gap-4">
+          <div>
+            <p className="text-white/50 text-xs mb-1">Calories</p>
+            <p className="text-xl font-bold">{Math.round(totals.calories)}</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Protein</p>
+            <p className="text-xl font-bold">{Math.round(totals.protein)}g</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Carbs</p>
+            <p className="text-xl font-bold">{Math.round(totals.carbs)}g</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Fat</p>
+            <p className="text-xl font-bold">{Math.round(totals.fat)}g</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {MEAL_SECTIONS.map((section, i) => {
+          const sectionMeals = (meals ?? []).filter((m) => m.meal_type === section.type)
+          return (
+            <motion.div key={section.type} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+              <Card>
+                <CardHeader className="flex-row items-center justify-between pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <section.icon className="size-4 text-muted-foreground" />
+                    {section.label}
+                  </CardTitle>
+                  <Button variant="ghost" size="icon-sm" onClick={() => setDialogMealType(section.type)}>
+                    <Plus className="size-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  {isLoading ? (
+                    <div className="h-8" />
+                  ) : sectionMeals.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">No items logged</p>
+                  ) : (
+                    sectionMeals.map((meal) => (
+                      <div key={meal.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{meal.food_name}</p>
+                          {meal.quantity && <p className="text-xs text-muted-foreground">{meal.quantity}</p>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {meal.calories && <Badge variant="outline">{meal.calories} kcal</Badge>}
+                          <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      <Dialog open={!!dialogMealType} onOpenChange={(open) => !open && setDialogMealType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add {MEAL_SECTIONS.find((s) => s.type === dialogMealType)?.label}</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            <Input placeholder="Food name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            <Input placeholder="Quantity (e.g. 200g, 1 cup)" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="Calories" value={form.calories} onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))} />
+              <Input type="number" placeholder="Protein (g)" value={form.protein} onChange={(e) => setForm((f) => ({ ...f, protein: e.target.value }))} />
+              <Input type="number" placeholder="Carbs (g)" value={form.carbs} onChange={(e) => setForm((f) => ({ ...f, carbs: e.target.value }))} />
+              <Input type="number" placeholder="Fat (g)" value={form.fat} onChange={(e) => setForm((f) => ({ ...f, fat: e.target.value }))} />
+              <Input type="number" placeholder="Fiber (g)" value={form.fiber} onChange={(e) => setForm((f) => ({ ...f, fiber: e.target.value }))} />
+              <Input type="number" placeholder="Sugar (g)" value={form.sugar} onChange={(e) => setForm((f) => ({ ...f, sugar: e.target.value }))} />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogMealType(null)}>
+              Cancel
+            </Button>
+            <Button variant="gradient" onClick={handleAdd} disabled={!form.name.trim() || addMeal.isPending}>
+              <Star className="size-4" /> Log Item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
