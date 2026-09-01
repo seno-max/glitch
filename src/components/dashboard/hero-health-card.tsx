@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
-import { Flame, Zap, Trophy } from 'lucide-react'
+import { Flame, Trophy, Star } from 'lucide-react'
 import type { DashboardSummary } from '@/types/models'
-import { Progress } from '@/components/ui/progress'
 import { formatDisplayDate } from '@/utils/date'
 
 export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
   const weightDiff = summary.weightDifferenceKg
   const gymStreak = summary.currentStreaks.find((s) => s.category === 'gym')
+  const stepsStreak = summary.currentStreaks.find((s) => s.category === 'steps')
 
   return (
     <motion.div
@@ -42,28 +42,26 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
         </div>
 
         <div className="mt-6 flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
-            <Zap className="size-4 text-amber-400" />
-            <span className="text-sm font-semibold">Lvl {summary.level}</span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
+          <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-400/20 px-3 py-1.5">
             <Trophy className="size-4 text-amber-400" />
             <span className="text-sm font-semibold">{summary.pointsToday} pts today</span>
           </div>
+          <div className="flex items-center gap-1.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/20 px-3 py-1.5">
+            <Star className="size-4 text-fuchsia-300" />
+            <span className="text-sm font-semibold">{summary.totalPoints} total pts</span>
+          </div>
           {gymStreak && gymStreak.current_streak > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
+            <div className="flex items-center gap-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 px-3 py-1.5">
               <Flame className="size-4 text-orange-400" />
               <span className="text-sm font-semibold">{gymStreak.current_streak} day gym streak</span>
             </div>
           )}
-        </div>
-
-        <div className="mt-4 max-w-xs">
-          <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-            <span>XP Progress</span>
-            <span>{summary.xpProgressPct}%</span>
-          </div>
-          <Progress value={summary.xpProgressPct} max={100} trackClass="bg-white/10" />
+          {stepsStreak && stepsStreak.current_streak > 0 && (
+            <div className="flex items-center gap-1.5 rounded-full bg-rose-500/15 border border-rose-400/20 px-3 py-1.5">
+              <Flame className="size-4 text-rose-400" />
+              <span className="text-sm font-semibold">{stepsStreak.current_streak} day step streak</span>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Sun, MoonStar, Monitor, Download, Trash2, LogOut, ShieldOff, Loader2, ListChecks, Zap } from 'lucide-react'
+import { Settings as SettingsIcon, Sun, MoonStar, Monitor, Download, Trash2, LogOut, ShieldOff, Loader2, Zap } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { HabitManager } from '@/components/settings/habit-manager'
 import { useSettings } from '@/hooks/use-tracking'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -116,21 +117,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ListChecks className="size-4" /> My Habits
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-3">
-            Manage the custom habits you track every day — add new ones, change how many times a day they need checking, or adjust rewards.
-          </p>
-          <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
-            Manage Habits on Dashboard
-          </Button>
-        </CardContent>
-      </Card>
+      <HabitManager />
 
       <Card>
         <CardHeader>
@@ -152,7 +139,6 @@ export default function SettingsPage() {
             <div>
               <label className="text-xs text-muted-foreground">Step Goal</label>
               <Input type="number" value={stepGoal} onChange={(e) => setStepGoal(Number(e.target.value))} />
-              <p className="text-[11px] text-muted-foreground mt-1">Not everyone wants 10,000 steps — set your own target.</p>
             </div>
           </div>
           <Button variant="gradient" onClick={handleSaveGoals}>
@@ -168,9 +154,6 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Choose exactly what earns points. Set any value to 0 to track the activity without rewarding it.
-          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Points for Gym Day</Label>

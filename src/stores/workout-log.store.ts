@@ -15,6 +15,7 @@ export interface DraftExercise {
   sets: number
   reps: number | null
   duration_seconds: number | null
+  distance_km: number | null
   rest_seconds: number | null
   rpe: number | null
   notes: string | null

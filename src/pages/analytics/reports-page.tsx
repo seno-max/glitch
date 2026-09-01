@@ -66,7 +66,7 @@ export default function ReportsPage() {
   const reports = [
     { title: 'Workout Summary', description: 'Strength & cardio breakdown' },
     { title: 'Strength Progress', description: 'Volume and PR trends' },
-    { title: 'Cardio Summary', description: 'Distance, time, calories' },
+    { title: 'Cardio Summary', description: 'Distance and time' },
     { title: 'Weight Progress', description: 'Trend and goal tracking' },
     { title: 'Food Summary', description: 'Nutrition logging overview' },
     { title: 'Water Summary', description: 'Hydration tracking' },

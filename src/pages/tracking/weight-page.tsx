@@ -19,48 +19,33 @@ export default function WeightPage() {
   const deleteWeight = useDeleteWeightLog()
   const [range, setRange] = useState<'week' | 'month' | 'year' | 'all'>('month')
 
-  const [form, setForm] = useState({
-    date: todayStr(),
-    weight: '',
-    bodyFat: '',
-    muscle: '',
-    visceralFat: '',
-    bodyWater: '',
-    notes: '',
-  })
+  const [date, setDate] = useState(todayStr())
+  const [weight, setWeight] = useState('')
 
   const days = range === 'week' ? 7 : range === 'month' ? 30 : range === 'year' ? 365 : 3650
   const filtered = (history ?? []).filter((h) => parseISO(h.date) >= subDays(new Date(), days))
   const chartData = filtered.map((h) => ({ date: format(parseISO(h.date), days > 60 ? 'MMM' : 'MMM d'), weight: h.weight_kg }))
 
-  // "Current" = most recent log by date, regardless of gaps — the user logs
-  // whenever they choose, not on a fixed schedule.
+  // "Current" = most recent log by date, regardless of gaps.
   const sortedByDate = (history ?? []).slice().sort((a, b) => (a.date < b.date ? -1 : 1))
   const latest = sortedByDate.length > 0 ? sortedByDate[sortedByDate.length - 1] : null
   const first = sortedByDate.length > 0 ? sortedByDate[0] : null
   const totalChange = latest && first ? Math.round((latest.weight_kg - first.weight_kg) * 10) / 10 : null
   const goalWeight = profile?.goal_weight_kg
 
-  const bmi = () => {
-    const w = Number(form.weight) || latest?.weight_kg
-    if (!w || !profile?.height_cm) return null
-    const hM = profile.height_cm / 100
-    return Math.round((w / (hM * hM)) * 10) / 10
-  }
-
   const handleLog = async () => {
-    if (!form.weight || !form.date) return
+    if (!weight || !date) return
     await logWeight.mutateAsync({
-      date: form.date,
-      weight_kg: Number(form.weight),
-      body_fat_pct: form.bodyFat ? Number(form.bodyFat) : null,
-      bmi: bmi(),
-      muscle_pct: form.muscle ? Number(form.muscle) : null,
-      visceral_fat: form.visceralFat ? Number(form.visceralFat) : null,
-      body_water_pct: form.bodyWater ? Number(form.bodyWater) : null,
-      notes: form.notes || null,
+      date,
+      weight_kg: Number(weight),
+      body_fat_pct: null,
+      bmi: null,
+      muscle_pct: null,
+      visceral_fat: null,
+      body_water_pct: null,
+      notes: null,
     })
-    setForm({ date: todayStr(), weight: '', bodyFat: '', muscle: '', visceralFat: '', bodyWater: '', notes: '' })
+    setWeight('')
   }
 
   const recentEntries = sortedByDate.slice().reverse().slice(0, 15)
@@ -70,9 +55,6 @@ export default function WeightPage() {
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <Scale className="size-6 text-secondary" /> Weight Tracker
       </h1>
-      <p className="text-sm text-muted-foreground -mt-4">
-        Log your weight whenever you check in — no daily requirement. Your most recent entry becomes your current weight.
-      </p>
 
       <div className="grid grid-cols-3 gap-4">
         <Card>
@@ -105,22 +87,20 @@ export default function WeightPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Log a Weight Check-in</CardTitle>
+          <CardTitle>Log Weight</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Date</Label>
-              <Input type="date" max={todayStr()} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+              <Input type="date" max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
-            <Input type="number" step="0.1" placeholder="Weight (kg) *" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} />
-            <Input type="number" step="0.1" placeholder="Body Fat %" value={form.bodyFat} onChange={(e) => setForm((f) => ({ ...f, bodyFat: e.target.value }))} />
-            <Input type="number" step="0.1" placeholder="Muscle %" value={form.muscle} onChange={(e) => setForm((f) => ({ ...f, muscle: e.target.value }))} />
-            <Input type="number" step="0.1" placeholder="Visceral Fat" value={form.visceralFat} onChange={(e) => setForm((f) => ({ ...f, visceralFat: e.target.value }))} />
-            <Input type="number" step="0.1" placeholder="Body Water %" value={form.bodyWater} onChange={(e) => setForm((f) => ({ ...f, bodyWater: e.target.value }))} />
-            <Input placeholder="Notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="col-span-2" />
+            <div>
+              <Label className="text-xs">Weight (kg)</Label>
+              <Input type="number" step="0.1" placeholder="e.g. 72.5" value={weight} onChange={(e) => setWeight(e.target.value)} />
+            </div>
           </div>
-          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!form.weight || !form.date || logWeight.isPending}>
+          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!weight || !date || logWeight.isPending}>
             Save Entry
           </Button>
         </CardContent>
@@ -168,10 +148,7 @@ export default function WeightPage() {
             <div className="space-y-1">
               {recentEntries.map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
-                    {entry.notes && <p className="text-xs text-muted-foreground">{entry.notes}</p>}
-                  </div>
+                  <p className="text-sm font-medium">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
                   <div className="flex items-center gap-3">
                     <p className="text-sm font-semibold">{entry.weight_kg} kg</p>
                     <Button

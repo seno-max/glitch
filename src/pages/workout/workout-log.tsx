@@ -71,6 +71,7 @@ export default function WorkoutLogPage() {
           sets: ex.sets,
           reps: ex.reps || null,
           duration_seconds: ex.duration_seconds,
+          distance_km: ex.distance_km,
           rest_seconds: ex.rest_seconds,
           rpe: ex.rpe,
           notes: ex.notes,

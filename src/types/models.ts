@@ -47,10 +47,7 @@ export interface DashboardSummary {
   weightDifferenceKg: number | null
   lastWeightLogDate: string | null
   pointsToday: number
-  level: number
-  xp: number
-  xpForNextLevel: number
-  xpProgressPct: number
+  totalPoints: number
   currentStreaks: Streak[]
   habitsToday: HabitProgress[]
   todaysProgress: DailyProgress
@@ -74,7 +71,6 @@ export interface DailyProgress {
   stepsGoal: number
   waterCurrentMl: number
   waterGoalMl: number
-  caloriesConsumed: number
   workoutDone: boolean
 }
 

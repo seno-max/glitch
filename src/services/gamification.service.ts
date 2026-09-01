@@ -53,6 +53,13 @@ export const gamificationService = {
     return (data ?? []) as unknown as PointsLedgerEntry[]
   },
 
+  /** All-time cumulative points earned by the user. */
+  async getTotalPoints(userId: string): Promise<number> {
+    const { data, error } = await supabase.from('points_ledger').select('points').eq('user_id', userId)
+    if (error) throw error
+    return (data ?? []).reduce((sum: number, r: { points: number }) => sum + r.points, 0)
+  },
+
   // ---------------- XP (profile) ----------------
   async addXp(userId: string, xpDelta: number): Promise<{ xp: number; level: number }> {
     const { data: profile, error: fetchError } = await supabase.from('profiles').select('xp,level').eq('id', userId).single()

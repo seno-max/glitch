@@ -4,7 +4,6 @@ import { Plus, Trash2, Star, Coffee, Sun, Cookie, Moon, GlassWater, Milk, Pill, 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { useMealsForDate, useAddMeal, useDeleteMeal } from '@/hooks/use-nutrition'
 import { todayStr, formatDisplayDate } from '@/utils/date'
@@ -27,14 +26,9 @@ export default function NutritionPage() {
   const addMeal = useAddMeal()
   const deleteMeal = useDeleteMeal()
   const [dialogMealType, setDialogMealType] = useState<MealType | null>(null)
-  const [form, setForm] = useState({ name: '', quantity: '', calories: '' })
+  const [form, setForm] = useState({ name: '', quantity: '' })
 
-  const totals = (meals ?? []).reduce(
-    (acc, m) => ({ calories: acc.calories + (m.calories ?? 0) }),
-    { calories: 0 }
-  )
-
-  const resetForm = () => setForm({ name: '', quantity: '', calories: '' })
+  const resetForm = () => setForm({ name: '', quantity: '' })
 
   const handleAdd = async () => {
     if (!dialogMealType || !form.name.trim()) return
@@ -44,7 +38,7 @@ export default function NutritionPage() {
       food_id: null,
       food_name: form.name,
       quantity: form.quantity || null,
-      calories: form.calories ? Number(form.calories) : null,
+      calories: null,
       protein_g: null,
       carbs_g: null,
       fat_g: null,
@@ -63,14 +57,6 @@ export default function NutritionPage() {
         <h1 className="text-2xl font-bold">Nutrition</h1>
         <p className="text-sm text-muted-foreground">{formatDisplayDate(date)}</p>
       </div>
-
-      <Card className="gradient-hero text-white">
-        <CardContent className="p-6">
-          <p className="text-white/50 text-xs mb-1">Calories Today</p>
-          <p className="text-3xl font-bold">{Math.round(totals.calories)}</p>
-          <p className="text-white/50 text-xs mt-1">Just log what you eat — no need to track protein/carbs/fat.</p>
-        </CardContent>
-      </Card>
 
       <div className="grid sm:grid-cols-2 gap-4">
         {MEAL_SECTIONS.map((section, i) => {
@@ -99,12 +85,9 @@ export default function NutritionPage() {
                           <p className="font-medium">{meal.food_name}</p>
                           {meal.quantity && <p className="text-xs text-muted-foreground">{meal.quantity}</p>}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {meal.calories && <Badge variant="outline">{meal.calories} kcal</Badge>}
-                          <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
+                        <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="size-3.5" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -123,7 +106,6 @@ export default function NutritionPage() {
           <DialogBody className="space-y-3">
             <Input placeholder="Food name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Quantity (e.g. 200g, 1 cup)" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
-            <Input type="number" placeholder="Calories (optional)" value={form.calories} onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))} />
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogMealType(null)}>

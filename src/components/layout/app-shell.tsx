@@ -7,16 +7,6 @@ import {
   BarChart3,
   Settings,
   Calendar,
-  Droplets,
-  Scale,
-  Trophy,
-  Target,
-  Camera,
-  Moon,
-  Smile,
-  Footprints,
-  Ruler,
-  FileText,
   Sun,
   MoonStar,
   Monitor,
@@ -36,23 +26,6 @@ const mainNav = [
   { to: '/workout', icon: Dumbbell, label: 'Workout' },
   { to: '/nutrition', icon: UtensilsCrossed, label: 'Nutrition' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-]
-
-const trackingNav = [
-  { to: '/tracking/water', icon: Droplets, label: 'Water' },
-  { to: '/tracking/weight', icon: Scale, label: 'Weight' },
-  { to: '/tracking/steps', icon: Footprints, label: 'Steps' },
-  { to: '/tracking/sleep', icon: Moon, label: 'Sleep' },
-  { to: '/tracking/mood', icon: Smile, label: 'Mood' },
-  { to: '/tracking/measurements', icon: Ruler, label: 'Measurements' },
-  { to: '/tracking/photos', icon: Camera, label: 'Photos' },
-]
-
-const gamificationNav = [
-  { to: '/achievements', icon: Trophy, label: 'Achievements' },
-  { to: '/challenges', icon: Target, label: 'Challenges' },
-  { to: '/personal-records', icon: Trophy, label: 'Records' },
-  { to: '/reports', icon: FileText, label: 'Reports' },
 ]
 
 const bottomNav = [
@@ -118,14 +91,6 @@ export function AppShell() {
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide">
           {mainNav.map((item) => (
-            <SidebarLink key={item.to} {...item} />
-          ))}
-          <SectionLabel>Tracking</SectionLabel>
-          {trackingNav.map((item) => (
-            <SidebarLink key={item.to} {...item} />
-          ))}
-          <SectionLabel>Progress</SectionLabel>
-          {gamificationNav.map((item) => (
             <SidebarLink key={item.to} {...item} />
           ))}
           <SectionLabel>Account</SectionLabel>
@@ -196,14 +161,6 @@ export function AppShell() {
               </div>
               <div onClick={() => setMobileMenuOpen(false)}>
                 {mainNav.map((item) => (
-                  <SidebarLink key={item.to} {...item} />
-                ))}
-                <SectionLabel>Tracking</SectionLabel>
-                {trackingNav.map((item) => (
-                  <SidebarLink key={item.to} {...item} />
-                ))}
-                <SectionLabel>Progress</SectionLabel>
-                {gamificationNav.map((item) => (
                   <SidebarLink key={item.to} {...item} />
                 ))}
                 <SectionLabel>Account</SectionLabel>

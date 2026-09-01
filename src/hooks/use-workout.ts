@@ -116,6 +116,7 @@ export function useSaveWorkoutLog() {
           rest_seconds: ex.rest_seconds,
           rpe: ex.rpe,
           duration_seconds: ex.duration_seconds,
+          distance_km: ex.distance_km,
           notes: ex.notes,
           order_index: i,
           performed_at: gymEntryTime,

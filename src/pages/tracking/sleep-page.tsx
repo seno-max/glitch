@@ -65,9 +65,6 @@ export default function SleepPage() {
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <Moon className="size-6 text-secondary" /> Sleep Tracker
       </h1>
-      <p className="text-sm text-muted-foreground -mt-4">
-        Just log and monitor your sleep cycle — there's no nightly requirement, this is purely for your own awareness.
-      </p>
 
       <Card>
         <CardHeader>

@@ -8,9 +8,8 @@ import { weekRange, monthRange } from '@/utils/date'
 
 export const analyticsService = {
   async getSummary(userId: string, startDate: string, endDate: string): Promise<AnalyticsSummary> {
-    const [sessions, cardioSessions, weightLogs, pointsEntries, waterLogs, stepLogs, meals] = await Promise.all([
+    const [sessions, weightLogs, pointsEntries, waterLogs, stepLogs, meals] = await Promise.all([
       workoutService.getSessionsInRange(userId, startDate, endDate),
-      workoutService.getCardioSessionsInRange(userId, startDate, endDate),
       trackingService.getWeightLogsInRange(userId, startDate, endDate),
       gamificationService.getPointsInRange(userId, startDate, endDate),
       trackingService.getWaterLogsInRange(userId, startDate, endDate),
@@ -18,17 +17,27 @@ export const analyticsService = {
       nutritionService.getMealsInRange(userId, startDate, endDate),
     ])
 
-    // Strength volume: sum across sessions in range
+    // Strength volume + cardio hours/distance: all exercises are logged in
+    // one unified table now (strength_exercises). A cardio-style entry is
+    // simply one where duration_seconds and/or distance_km were filled in
+    // (e.g. "5km Run", "Treadmill Intervals") rather than weight x reps.
     const sessionIds = sessions.map((s) => s.id)
     let strengthVolumeKg = 0
+    let cardioMinutes = 0
+    let cardioDistanceKm = 0
     if (sessionIds.length) {
-      const { data } = await supabase.from('strength_exercises').select('volume_kg').in('session_id', sessionIds)
-      strengthVolumeKg = (data ?? []).reduce((sum: number, r: { volume_kg: number | null }) => sum + (r.volume_kg ?? 0), 0)
+      const { data } = await supabase
+        .from('strength_exercises')
+        .select('volume_kg, duration_seconds, distance_km, sets')
+        .in('session_id', sessionIds)
+      for (const r of (data ?? []) as { volume_kg: number | null; duration_seconds: number | null; distance_km: number | null; sets: number | null }[]) {
+        strengthVolumeKg += r.volume_kg ?? 0
+        if (r.duration_seconds) cardioMinutes += (r.duration_seconds * (r.sets || 1)) / 60
+        if (r.distance_km) cardioDistanceKm += r.distance_km
+      }
     }
 
     const workoutMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0)
-    const cardioMinutes = cardioSessions.reduce((sum, c) => sum + (c.duration_minutes ?? 0), 0)
-    const cardioDistanceKm = cardioSessions.reduce((sum, c) => sum + (c.distance_km ?? 0), 0)
 
     const avgSteps = stepLogs.length ? stepLogs.reduce((s, l) => s + l.steps, 0) / stepLogs.length : 0
     const avgWaterMl = waterLogs.length

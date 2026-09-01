@@ -217,6 +217,7 @@ export interface StrengthExercise {
   rest_seconds: number | null
   rpe: number | null
   duration_seconds: number | null
+  distance_km: number | null
   notes: string | null
   volume_kg: number | null
   order_index: number

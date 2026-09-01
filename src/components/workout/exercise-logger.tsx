@@ -11,8 +11,9 @@ import { useQuery } from '@tanstack/react-query'
 /**
  * Unified exercise logger for the manual gym-log workflow. A single entry
  * captures whatever is relevant: sets + reps + weight for strength work,
- * and/or sets + duration (seconds) for timed/cardio-style exercises like
- * "30 secs x 3 sets" burpees. Fields left blank are simply not recorded.
+ * and/or sets + duration (seconds) + distance (km) for timed/cardio-style
+ * exercises like "30 secs x 3 sets" burpees or a 5km run. Fields left blank
+ * are simply not recorded.
  */
 export function ExerciseLogger() {
   const { exercises, addExercise, updateExercise, removeExercise } = useWorkoutLogStore()
@@ -34,6 +35,7 @@ export function ExerciseLogger() {
       sets: 3,
       reps: 10,
       duration_seconds: null,
+      distance_km: null,
       rest_seconds: null,
       rpe: null,
       notes: null,
@@ -61,7 +63,7 @@ export function ExerciseLogger() {
                 <Trash2 className="size-4" />
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Sets</label>
                 <Input
@@ -97,6 +99,16 @@ export function ExerciseLogger() {
                   placeholder="e.g. 30"
                   value={ex.duration_seconds ?? ''}
                   onChange={(e) => updateExercise(ex.tempId, { duration_seconds: e.target.value === '' ? null : Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Distance (km)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 5 (for a run)"
+                  value={ex.distance_km ?? ''}
+                  onChange={(e) => updateExercise(ex.tempId, { distance_km: e.target.value === '' ? null : Number(e.target.value) })}
                 />
               </div>
               <div>

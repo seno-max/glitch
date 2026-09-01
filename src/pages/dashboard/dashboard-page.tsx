@@ -4,6 +4,7 @@ import { QuickActions } from '@/components/dashboard/quick-actions'
 import { HabitsCard } from '@/components/dashboard/habits-card'
 import { TodaysProgress } from '@/components/dashboard/todays-progress'
 import { PeriodProgressCard } from '@/components/dashboard/period-progress-card'
+import { MoreFeaturesGrid } from '@/components/dashboard/more-features-grid'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDisplayDate } from '@/utils/date'
 
@@ -48,6 +49,8 @@ export default function DashboardPage() {
         <PeriodProgressCard progress={data.weeklyProgress} />
         <PeriodProgressCard progress={data.monthlyProgress} />
       </div>
+
+      <MoreFeaturesGrid />
     </div>
   )
 }

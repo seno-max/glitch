@@ -3,11 +3,9 @@ import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
 import { trackingService } from '@/services/tracking.service'
 import { gamificationService } from '@/services/gamification.service'
-import { nutritionService } from '@/services/nutrition.service'
 import { profileService } from '@/services/profile.service'
 import { habitsService } from '@/services/habits.service'
 import { todayStr, getGreeting, weekRange, monthRange } from '@/utils/date'
-import { getLevelForXp } from '@/types/models'
 import type { DashboardSummary, HabitProgress, PeriodProgress } from '@/types/models'
 
 export function useDashboard() {
@@ -28,7 +26,6 @@ export function useDashboard() {
         settings,
         waterLogs,
         stepLog,
-        meals,
         streaks,
         habits,
         todaysCheckins,
@@ -40,13 +37,13 @@ export function useDashboard() {
         monthWater,
         weekWeights,
         monthWeights,
+        totalPoints,
       ] = await Promise.all([
         workoutService.getSessionsByDate(userId!, date),
         trackingService.getLatestWeightLog(userId!),
         profileService.getSettings(userId!),
         trackingService.getWaterLogsByDate(userId!, date),
         trackingService.getStepLogByDate(userId!, date),
-        nutritionService.getMealsByDate(userId!, date),
         gamificationService.getStreaks(userId!),
         habitsService.getHabits(userId!, true),
         habitsService.getCheckinsForDate(userId!, date),
@@ -58,6 +55,7 @@ export function useDashboard() {
         trackingService.getWaterLogsInRange(userId!, month.start, month.end),
         trackingService.getWeightLogsInRange(userId!, week.start, week.end),
         trackingService.getWeightLogsInRange(userId!, month.start, month.end),
+        gamificationService.getTotalPoints(userId!),
       ])
 
       const pointsToday = await gamificationService.getPointsForDate(userId!, date)
@@ -68,11 +66,7 @@ export function useDashboard() {
       const goalWeight = profile?.goal_weight_kg ?? null
       const weightDifference = currentWeight !== null && goalWeight !== null ? Math.round((currentWeight - goalWeight) * 10) / 10 : null
 
-      const xp = profile?.xp ?? 0
-      const { level, progressPct, xpForNextLevel } = getLevelForXp(xp)
-
       const waterTotal = waterLogs.reduce((s, w) => s + w.amount_ml, 0)
-      const caloriesConsumed = meals.reduce((s, m) => s + (m.calories ?? 0), 0)
       const workoutDone = sessions.some((s) => s.is_completed)
 
       // Build today's habit progress from the user's own custom habit list —
@@ -124,10 +118,7 @@ export function useDashboard() {
         weightDifferenceKg: weightDifference,
         lastWeightLogDate: latestWeight?.date ?? null,
         pointsToday,
-        level,
-        xp,
-        xpForNextLevel,
-        xpProgressPct: progressPct,
+        totalPoints,
         currentStreaks: streaks,
         habitsToday,
         todaysProgress: {
@@ -135,7 +126,6 @@ export function useDashboard() {
           stepsGoal: settings?.step_goal ?? 10000,
           waterCurrentMl: waterTotal,
           waterGoalMl: settings?.water_goal_ml ?? 3000,
-          caloriesConsumed,
           workoutDone,
         },
         weeklyProgress: buildPeriodProgress('This Week', weekSessions, weekSteps, weekWater, weekWeights),

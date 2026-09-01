@@ -32,7 +32,6 @@ export default function DayDetailPage() {
     )
   }
 
-  const totalCalories = data.meals.reduce((s, m) => s + (m.calories ?? 0), 0)
   const totalWater = data.waterLogs.reduce((s, w) => s + w.amount_ml, 0)
 
   return (
@@ -107,9 +106,11 @@ export default function DayDetailPage() {
                         <div key={ex.id} className="flex justify-between text-sm text-muted-foreground">
                           <span>{ex.exercise_name}</span>
                           <span>
-                            {ex.duration_seconds
-                              ? `${ex.duration_seconds}s × ${ex.sets} sets`
-                              : `${ex.weight_kg ? `${ex.weight_kg}kg × ` : ''}${ex.sets}×${ex.reps}`}
+                            {ex.distance_km
+                              ? `${ex.distance_km}km${ex.duration_seconds ? ` · ${Math.round(ex.duration_seconds / 60)}min` : ''}`
+                              : ex.duration_seconds
+                                ? `${ex.duration_seconds}s × ${ex.sets} sets`
+                                : `${ex.weight_kg ? `${ex.weight_kg}kg × ` : ''}${ex.sets}×${ex.reps}`}
                           </span>
                         </div>
                       ))}
@@ -153,11 +154,10 @@ export default function DayDetailPage() {
 
       {/* Nutrition */}
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UtensilsCrossed className="size-4" /> Nutrition
           </CardTitle>
-          <Badge>{totalCalories} kcal</Badge>
         </CardHeader>
         <CardContent>
           {data.meals.length === 0 ? (
@@ -170,7 +170,7 @@ export default function DayDetailPage() {
                     <span className="font-medium">{meal.food_name}</span>
                     <span className="text-muted-foreground ml-2 text-xs uppercase">{meal.meal_type.replace('_', ' ')}</span>
                   </div>
-                  <span className="text-muted-foreground">{meal.calories ? `${meal.calories} kcal` : ''}</span>
+                  {meal.quantity && <span className="text-muted-foreground text-xs">{meal.quantity}</span>}
                 </div>
               ))}
             </div>
