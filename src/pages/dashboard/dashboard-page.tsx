@@ -1,7 +1,7 @@
 import { useDashboard } from '@/hooks/use-dashboard'
 import { HeroHealthCard } from '@/components/dashboard/hero-health-card'
 import { QuickActions } from '@/components/dashboard/quick-actions'
-import { TodaysTasks } from '@/components/dashboard/todays-tasks'
+import { HabitsCard } from '@/components/dashboard/habits-card'
 import { TodaysProgress } from '@/components/dashboard/todays-progress'
 import { PeriodProgressCard } from '@/components/dashboard/period-progress-card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -40,7 +40,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <TodaysTasks tasks={data.todaysTasks} />
+        <HabitsCard habitsToday={data.habitsToday} />
         <TodaysProgress progress={data.todaysProgress} />
       </div>
 

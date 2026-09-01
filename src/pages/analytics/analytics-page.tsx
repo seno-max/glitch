@@ -65,22 +65,22 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Health Score Trend</CardTitle>
+                <CardTitle>Points Earned Trend</CardTitle>
               </CardHeader>
               <CardContent className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.healthScoreTrend.map((s) => ({ date: format(parseISO(s.date), 'MMM d'), score: s.score }))}>
+                  <AreaChart data={data.pointsTrend.map((s) => ({ date: format(parseISO(s.date), 'MMM d'), points: s.points }))}>
                     <defs>
-                      <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="pointsGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
                         <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
+                    <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: 'none' }} />
-                    <Area type="monotone" dataKey="score" stroke="#10b981" strokeWidth={3} fill="url(#scoreGradient)" />
+                    <Area type="monotone" dataKey="points" stroke="#10b981" strokeWidth={3} fill="url(#pointsGradient)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -108,14 +108,14 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Weekly Score</p>
-                <p className="text-xl font-bold">{data.weeklyScore}</p>
+                <p className="text-xs text-muted-foreground">Weekly Points</p>
+                <p className="text-xl font-bold">{data.weeklyPoints}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Monthly Score</p>
-                <p className="text-xl font-bold">{data.monthlyScore}</p>
+                <p className="text-xs text-muted-foreground">Monthly Points</p>
+                <p className="text-xl font-bold">{data.monthlyPoints}</p>
               </CardContent>
             </Card>
             <Card>

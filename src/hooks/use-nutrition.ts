@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth.store'
 import { nutritionService } from '@/services/nutrition.service'
-import { updateStreak } from '@/services/scoring.engine'
 import type { Meal, MealType } from '@/types/database.types'
 import toast from 'react-hot-toast'
 
@@ -23,12 +22,9 @@ export function useAddMeal() {
       if (!user) throw new Error('Not authenticated')
       return nutritionService.addMeal({ ...payload, user_id: user.id })
     },
-    onSuccess: async (meal) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['meals'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      if (user) {
-        await updateStreak(user.id, 'food_logging', meal.date)
-      }
       toast.success('Meal logged!')
     },
   })

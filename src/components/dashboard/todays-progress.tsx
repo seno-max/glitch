@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Footprints, Droplets, Flame, Moon } from 'lucide-react'
+import { Footprints, Droplets, Flame } from 'lucide-react'
 import type { DailyProgress } from '@/types/models'
 
 export function TodaysProgress({ progress }: { progress: DailyProgress }) {
@@ -33,14 +33,6 @@ export function TodaysProgress({ progress }: { progress: DailyProgress }) {
           goal={2200}
           formatValue={(v) => `${Math.round(v)} kcal`}
           colorClass="gradient-fire"
-        />
-        <ProgressRow
-          icon={Moon}
-          label="Sleep"
-          current={progress.sleepHours ?? 0}
-          goal={progress.sleepGoalHours}
-          formatValue={(v) => `${v.toFixed(1)}h`}
-          colorClass="gradient-secondary"
         />
       </CardContent>
     </Card>

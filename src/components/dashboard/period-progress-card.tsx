@@ -11,7 +11,7 @@ export function PeriodProgressCard({ progress }: { progress: PeriodProgress }) {
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-4">
         <Metric icon={Dumbbell} label="Workouts" value={progress.workoutsCompleted.toString()} />
-        <Metric icon={Star} label="Avg Score" value={`${progress.avgScore}`} />
+        <Metric icon={Star} label="Workout Minutes" value={progress.totalWorkoutMinutes.toString()} />
         <Metric icon={Star} label="Avg Steps" value={progress.avgSteps.toLocaleString()} />
         <Metric
           icon={progress.weightChangeKg !== null && progress.weightChangeKg <= 0 ? TrendingDown : TrendingUp}

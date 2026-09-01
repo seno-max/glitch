@@ -46,7 +46,7 @@ export type MealType =
 export type PhotoAngle = 'front' | 'side' | 'back'
 export type SleepQuality = 'excellent' | 'good' | 'average' | 'poor' | 'very_poor'
 export type MoodType = 'excellent' | 'good' | 'average' | 'bad' | 'very_bad'
-export type StreakCategory = 'gym' | 'steps' | 'water' | 'food_logging' | 'weight_logging' | 'sleep'
+export type StreakCategory = 'gym' | 'steps'
 export type PRCategory =
   | 'highest_weight'
   | 'longest_workout'
@@ -113,8 +113,41 @@ export interface Settings {
   notif_photo_reminder: boolean
   notif_challenge_reminder: boolean
   reminder_times: Record<string, string>
+  // Configurable points/rewards — user decides what's worth points.
+  gym_points: number
+  steps_points: number
+  gym_streak_days: number
+  gym_streak_points: number
   created_at: string
   updated_at: string
+}
+
+// ----------------------------------------------------------------------------
+// Habits — fully user-defined habit tracking (replaces the old fixed
+// checklist). Users decide the name, how many times/day it should be
+// checked, and whether it earns optional reward points.
+// ----------------------------------------------------------------------------
+export interface Habit {
+  id: string
+  user_id: string
+  name: string
+  icon: string
+  target_count: number
+  points: number | null
+  color: string | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface HabitCheckin {
+  id: string
+  habit_id: string
+  user_id: string
+  date: string
+  checked_at: string
+  created_at: string
 }
 
 export interface ExerciseLibraryItem {

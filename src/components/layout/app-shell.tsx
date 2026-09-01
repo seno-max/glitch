@@ -143,7 +143,7 @@ export function AppShell() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between h-16 px-4 border-b border-border bg-card/80 backdrop-blur-xl">
+      <header className="safe-header lg:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between px-4 border-b border-border bg-card/80 backdrop-blur-xl">
         <button onClick={() => setMobileMenuOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted">
           <Menu className="size-5" />
         </button>
@@ -216,7 +216,7 @@ export function AppShell() {
       </AnimatePresence>
 
       {/* Main content */}
-      <main className="lg:pl-64 pt-16 pb-20 lg:pb-6 min-h-screen">
+      <main className="safe-main lg:pl-64 min-h-screen">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -232,7 +232,7 @@ export function AppShell() {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 flex items-center justify-around h-16 border-t border-border bg-card/90 backdrop-blur-xl px-2">
+      <nav className="safe-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-30 flex items-center justify-around border-t border-border bg-card/90 backdrop-blur-xl px-2">
         {bottomNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

@@ -192,6 +192,11 @@ export const trackingService = {
     return data as unknown as SleepLog
   },
 
+  async deleteSleepLog(id: string): Promise<void> {
+    const { error } = await supabase.from('sleep_logs').delete().eq('id', id)
+    if (error) throw error
+  },
+
   // ---------------- Mood ----------------
   async getMoodLogByDate(userId: string, date: string): Promise<MoodLog | null> {
     const { data, error } = await supabase

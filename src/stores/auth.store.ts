@@ -54,7 +54,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut()
+    // scope: 'local' only revokes *this* device's session/refresh token.
+    // Supabase's default ('global') would sign the user out of every device
+    // they're logged into, which is not what "remember me"/multi-device
+    // login should do — each device's session must persist independently
+    // until that specific device explicitly signs out.
+    await supabase.auth.signOut({ scope: 'local' })
     set({ user: null, session: null, profile: null })
   },
 }))

@@ -4,9 +4,12 @@ import { Toaster } from 'react-hot-toast'
 import { useEffect, Suspense, lazy } from 'react'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore, applyTheme } from '@/stores/ui.store'
+import { useAndroidBackButton } from '@/hooks/use-android-back-button'
+import { useNativeStatusBar } from '@/hooks/use-native-status-bar'
 
 import { AppShell } from '@/components/layout/app-shell'
 import { AuthGuard } from '@/components/layout/auth-guard'
+import { GuestGuard } from '@/components/layout/guest-guard'
 import { SplashScreen } from '@/components/layout/splash-screen'
 
 const LoginPage = lazy(() => import('@/pages/auth/login'))
@@ -51,6 +54,16 @@ const queryClient = new QueryClient({
   },
 })
 
+/**
+ * Must render inside <BrowserRouter> so it can hook into router history for
+ * the Android back button, and applies native status bar styling.
+ */
+function NativeAppBindings() {
+  useAndroidBackButton()
+  useNativeStatusBar()
+  return null
+}
+
 function App() {
   const { initialize, isInitialized } = useAuthStore()
   const theme = useUIStore((s) => s.theme)
@@ -72,17 +85,34 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <NativeAppBindings />
         <Toaster
           position="top-center"
           toastOptions={{
-            className: 'glass-card !text-foreground',
-            style: { borderRadius: '1rem' },
+            className: 'border shadow-xl',
+            style: {
+              borderRadius: '1rem',
+              background: 'hsl(var(--card))',
+              color: 'hsl(var(--card-foreground))',
+              border: '1px solid hsl(var(--border))',
+              fontWeight: 500,
+            },
+            success: {
+              iconTheme: { primary: 'hsl(var(--success))', secondary: 'hsl(var(--card))' },
+              style: { border: '1px solid hsl(var(--success) / 0.4)' },
+            },
+            error: {
+              iconTheme: { primary: 'hsl(var(--destructive))', secondary: 'hsl(var(--card))' },
+              style: { border: '1px solid hsl(var(--destructive) / 0.4)' },
+            },
           }}
         />
         <Suspense fallback={<SplashScreen />}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route element={<GuestGuard />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+            </Route>
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 

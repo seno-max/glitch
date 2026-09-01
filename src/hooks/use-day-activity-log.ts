@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
 import { trackingService } from '@/services/tracking.service'
 import { nutritionService } from '@/services/nutrition.service'
-import { gamificationService } from '@/services/gamification.service'
+import { habitsService } from '@/services/habits.service'
 import type { DayActivityLog } from '@/types/models'
 
 export function useDayActivityLog(date: string) {
@@ -14,7 +14,7 @@ export function useDayActivityLog(date: string) {
     queryKey: ['day-activity-log', userId, date],
     enabled: !!userId && !!date,
     queryFn: async () => {
-      const [sessions, meals, waterLogs, weightLog, sleepLog, moodLog, stepLog, dailyScore, routine] = await Promise.all([
+      const [sessions, meals, waterLogs, weightLog, sleepLog, moodLog, stepLog, checkins, habits, routine] = await Promise.all([
         workoutService.getSessionsByDate(userId!, date),
         nutritionService.getMealsByDate(userId!, date),
         trackingService.getWaterLogsByDate(userId!, date),
@@ -22,7 +22,8 @@ export function useDayActivityLog(date: string) {
         trackingService.getSleepLogByDate(userId!, date),
         trackingService.getMoodLogByDate(userId!, date),
         trackingService.getStepLogByDate(userId!, date),
-        gamificationService.getDailyScore(userId!, date),
+        habitsService.getCheckinsForDate(userId!, date),
+        habitsService.getHabits(userId!, false),
         trackingService.getDailyRoutine(userId!, date),
       ])
 
@@ -33,6 +34,9 @@ export function useDayActivityLog(date: string) {
         })
       )
 
+      const habitById = new Map(habits.map((h) => [h.id, h]))
+      const habitCheckins = checkins.map((c) => ({ ...c, habit: habitById.get(c.habit_id) ?? null }))
+
       return {
         date,
         workoutSessions,
@@ -42,7 +46,7 @@ export function useDayActivityLog(date: string) {
         sleepLog,
         moodLog,
         stepLog,
-        dailyScore,
+        habitCheckins,
         wakeUpTime: routine?.wake_up_time ?? null,
         sleepTime: routine?.sleep_time ?? null,
         notes: routine?.notes ?? null,

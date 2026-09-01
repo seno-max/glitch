@@ -39,7 +39,7 @@ export function AuthLayout({ children, title, subtitle }: { children: React.Reac
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-background">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-background safe-top">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

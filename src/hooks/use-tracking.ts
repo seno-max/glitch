@@ -36,17 +36,9 @@ export function useAddWater() {
       if (!user) throw new Error('Not authenticated')
       return trackingService.addWaterLog(user.id, todayStr(), amountMl)
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['water'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      if (user) {
-        const logs = await trackingService.getWaterLogsByDate(user.id, todayStr())
-        const total = logs.reduce((s, l) => s + l.amount_ml, 0)
-        const settings = await profileService.getSettings(user.id)
-        if (total >= (settings?.water_goal_ml ?? 3000)) {
-          await updateStreak(user.id, 'water', todayStr())
-        }
-      }
     },
   })
 }
@@ -62,7 +54,10 @@ export function useWaterHistory(days = 7) {
 }
 
 // ---------------- Weight ----------------
-export function useWeightHistory(days = 90) {
+// Weight logging is fully user-paced: log whenever you feel like checking
+// in (no daily requirement). Whichever entry has the most recent date
+// becomes "Current Weight" on the dashboard, regardless of gaps between logs.
+export function useWeightHistory(days = 365) {
   const { user } = useAuthStore()
   const { start, end } = lastNDaysRange(days)
   return useQuery({
@@ -85,8 +80,13 @@ export function useLogWeight() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       if (user) {
-        await profileService.updateProfile(user.id, { current_weight_kg: log.weight_kg })
-        await updateStreak(user.id, 'weight_logging', log.date)
+        // Only update the dashboard's "current weight" if this log is the
+        // most recent one on record (logging a backdated entry shouldn't
+        // override a more recent current weight).
+        const latest = await trackingService.getLatestWeightLog(user.id)
+        if (!latest || log.date >= latest.date) {
+          await profileService.updateProfile(user.id, { current_weight_kg: log.weight_kg })
+        }
 
         // Check for weight PRs
         const lowest = await gamificationService.getBestPersonalRecord(user.id, 'lowest_weight')
@@ -103,6 +103,20 @@ export function useLogWeight() {
         }
       }
       toast.success('Weight logged!')
+    },
+  })
+}
+
+export function useDeleteWeightLog() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => trackingService.deleteWeightLog(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['weight-history'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      toast.success('Weight entry deleted')
     },
   })
 }
@@ -139,10 +153,19 @@ export function useLogSteps() {
     onSuccess: async (log) => {
       queryClient.invalidateQueries({ queryKey: ['steps'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      if (user && log.steps >= 10000) {
-        await updateStreak(user.id, 'steps', log.date)
+      if (user) {
+        const settings = await profileService.getSettings(user.id)
+        const stepGoal = settings?.step_goal ?? 10000
+        if (log.steps >= stepGoal) {
+          await updateStreak(user.id, 'steps', log.date)
+        }
         if (log.date === todayStr()) {
-          await awardDailyPoints(user.id, log.date, { gymCompleted: false, steps: log.steps })
+          await awardDailyPoints(
+            user.id,
+            log.date,
+            { steps: log.steps },
+            { gymPoints: 0, stepsPoints: settings?.steps_points ?? 0, stepGoal }
+          )
         }
       }
       toast.success('Steps updated!')
@@ -151,6 +174,8 @@ export function useLogSteps() {
 }
 
 // ---------------- Sleep ----------------
+// Sleep is purely observational: log & monitor your sleep cycle, no
+// mandatory nightly goal or points tied to it.
 export function useSleepHistory(days = 30) {
   const { user } = useAuthStore()
   const { start, end } = lastNDaysRange(days)
@@ -169,10 +194,10 @@ export function useLogSleep() {
       if (!user) throw new Error('Not authenticated')
       return trackingService.upsertSleepLog({ ...payload, user_id: user.id })
     },
-    onSuccess: async (log) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sleep-history'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      if (user) await updateStreak(user.id, 'sleep', log.date)
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
       toast.success('Sleep logged!')
     },
   })

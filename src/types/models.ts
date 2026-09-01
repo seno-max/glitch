@@ -7,10 +7,11 @@ import type {
   SleepLog,
   MoodLog,
   StepLog,
-  DailyScore,
   Streak,
   Challenge,
   PersonalRecord,
+  Habit,
+  HabitCheckin,
 } from './database.types'
 
 // ----------------------------------------------------------------------------
@@ -28,7 +29,7 @@ export interface CalendarDaySummary {
   date: string
   statuses: CalendarDayStatus[]
   primaryStatus: CalendarDayStatus
-  healthScore: number
+  pointsEarned: number
   hasWorkout: boolean
   hasWeightLog: boolean
   hasPR: boolean
@@ -44,26 +45,28 @@ export interface DashboardSummary {
   currentWeightKg: number | null
   goalWeightKg: number | null
   weightDifferenceKg: number | null
-  healthScoreToday: number
+  lastWeightLogDate: string | null
   pointsToday: number
   level: number
   xp: number
   xpForNextLevel: number
   xpProgressPct: number
   currentStreaks: Streak[]
-  todaysTasks: TaskItem[]
+  habitsToday: HabitProgress[]
   todaysProgress: DailyProgress
   weeklyProgress: PeriodProgress
   monthlyProgress: PeriodProgress
 }
 
-export interface TaskItem {
-  id: string
-  label: string
+// ----------------------------------------------------------------------------
+// Habits — dashboard view model combining a habit definition with today's
+// check-in progress against its own custom target_count.
+// ----------------------------------------------------------------------------
+export interface HabitProgress {
+  habit: Habit
+  checkedCount: number
   completed: boolean
-  icon: string
-  points?: number
-  href?: string
+  pointsAwardedToday: boolean
 }
 
 export interface DailyProgress {
@@ -73,8 +76,6 @@ export interface DailyProgress {
   waterGoalMl: number
   caloriesConsumed: number
   workoutDone: boolean
-  sleepHours: number | null
-  sleepGoalHours: number
 }
 
 export interface PeriodProgress {
@@ -83,7 +84,6 @@ export interface PeriodProgress {
   totalWorkoutMinutes: number
   avgSteps: number
   avgWater: number
-  avgScore: number
   weightChangeKg: number | null
 }
 
@@ -99,7 +99,7 @@ export interface DayActivityLog {
   sleepLog: SleepLog | null
   moodLog: MoodLog | null
   stepLog: StepLog | null
-  dailyScore: DailyScore | null
+  habitCheckins: (HabitCheckin & { habit: Habit | null })[]
   wakeUpTime: string | null
   sleepTime: string | null
   notes: string | null
@@ -143,46 +143,17 @@ export function getLevelForXp(xp: number): { level: number; xpIntoLevel: number;
 }
 
 // ----------------------------------------------------------------------------
-// Points system
+// Points / rewards
 // ----------------------------------------------------------------------------
-// By design, points are only awarded for the three things that matter most
-// for the weight-loss goal: completing a gym session, hitting 10k steps,
-// and a 5-day gym streak (see STREAK_MILESTONES below). Every other
-// tracked activity (water, food, sleep, weight, photos, mood, etc.) is
-// still logged and visible in the app, it just doesn't award points.
-export const POINTS = {
-  GYM_COMPLETED: 100,
-  STEPS_10K: 50,
-} as const
-
-// ----------------------------------------------------------------------------
-// Health score weights (out of ~260 total, normalized to 100 for display)
-// ----------------------------------------------------------------------------
-export const HEALTH_SCORE_WEIGHTS = {
-  gym: 100,
-  steps10k: 50,
-  waterGoal: 20,
-  foodLogged: 20,
-  sleepGoal: 30,
-  weightLogged: 10,
-  stretching: 10,
-  moodLogged: 10,
-  progressPhoto: 10,
-} as const
-
-export const HEALTH_SCORE_MAX = Object.values(HEALTH_SCORE_WEIGHTS).reduce((a, b) => a + b, 0)
-
-// ----------------------------------------------------------------------------
-// Streak milestone bonus points
-// ----------------------------------------------------------------------------
-// Only the gym streak awards a points bonus (5-day streak = 150 pts).
-// Other streak categories (water, sleep, food, weight) are tracked for
-// display purposes only and never award milestone points.
-export const STREAK_MILESTONES: { days: number; points: number }[] = [{ days: 5, points: 150 }]
-
-export function getStreakMilestoneBonus(streakDays: number): number {
-  const milestone = STREAK_MILESTONES.find((m) => m.days === streakDays)
-  return milestone?.points ?? 0
+// Points are fully configurable per-user (see Settings: gym_points,
+// steps_points, gym_streak_days, gym_streak_points) rather than fixed
+// constants — someone who doesn't care about a 10k step goal can set their
+// own step goal and decide whether it's worth any points at all (0 = off).
+// Custom habits (see Habit) also each have their own optional `points`
+// value, awarded once per day when a habit's daily target_count is met.
+export function computeStreakBonus(newStreakDays: number, streakGoalDays: number, streakBonusPoints: number): number {
+  if (streakBonusPoints <= 0 || streakGoalDays <= 0) return 0
+  return newStreakDays === streakGoalDays ? streakBonusPoints : 0
 }
 
 // ----------------------------------------------------------------------------
@@ -198,9 +169,9 @@ export interface AnalyticsSummary {
   avgWaterMl: number
   foodLoggingRatePct: number
   weightTrend: { date: string; weight: number }[]
-  weeklyScore: number
-  monthlyScore: number
-  healthScoreTrend: { date: string; score: number }[]
+  weeklyPoints: number
+  monthlyPoints: number
+  pointsTrend: { date: string; points: number }[]
   workoutHeatmap: { date: string; count: number }[]
   mostActiveDay: string | null
   bestWeek: string | null

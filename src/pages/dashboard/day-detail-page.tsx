@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote } from 'lucide-react'
+import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,7 +43,9 @@ export default function DayDetailPage() {
         </Button>
         <div>
           <h1 className="text-xl font-bold">{formatDisplayDate(date!)}</h1>
-          {data.dailyScore && <p className="text-sm text-muted-foreground">Health Score: {data.dailyScore.total_score}/100</p>}
+          {data.habitCheckins.length > 0 && (
+            <p className="text-sm text-muted-foreground">{data.habitCheckins.length} habit check-in{data.habitCheckins.length === 1 ? '' : 's'}</p>
+          )}
         </div>
       </div>
 
@@ -119,6 +121,35 @@ export default function DayDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Habits */}
+      {data.habitCheckins.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="size-4" /> Habits
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(
+              data.habitCheckins.reduce<Record<string, { name: string; icon: string; count: number }>>((acc, c) => {
+                const key = c.habit_id
+                if (!acc[key]) acc[key] = { name: c.habit?.name ?? 'Deleted habit', icon: c.habit?.icon ?? '⭐', count: 0 }
+                acc[key].count += 1
+                return acc
+              }, {})
+            ).map(([habitId, info]) => (
+              <div key={habitId} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
+                <span className="flex items-center gap-2">
+                  <span>{info.icon}</span>
+                  <span className="font-medium">{info.name}</span>
+                </span>
+                <span className="text-muted-foreground">Checked {info.count}x</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Nutrition */}
       <Card>

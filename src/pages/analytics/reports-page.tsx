@@ -42,8 +42,8 @@ export default function ReportsPage() {
         ['Average Steps', data.avgSteps.toLocaleString()],
         ['Average Water Intake', `${(data.avgWaterMl / 1000).toFixed(1)} L`],
         ['Food Logging Rate', `${data.foodLoggingRatePct}%`],
-        ['Weekly Score', data.weeklyScore.toString()],
-        ['Monthly Score', data.monthlyScore.toString()],
+        ['Weekly Points', data.weeklyPoints.toString()],
+        ['Monthly Points', data.monthlyPoints.toString()],
         ['Most Active Day', data.mostActiveDay ?? 'N/A'],
       ],
       theme: 'grid',
@@ -71,7 +71,7 @@ export default function ReportsPage() {
     { title: 'Food Summary', description: 'Nutrition logging overview' },
     { title: 'Water Summary', description: 'Hydration tracking' },
     { title: 'Achievements', description: 'Unlocked badges' },
-    { title: 'Health Score', description: 'Daily score history' },
+    { title: 'Points & Rewards', description: 'Points earned history' },
   ]
 
   return (

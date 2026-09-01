@@ -17,10 +17,10 @@ export function useCalendarMonth(year: number, month: number) {
     queryKey: ['calendar-month', userId, year, month],
     enabled: !!userId,
     queryFn: async () => {
-      const [sessions, weightLogs, scores, prs, challenges] = await Promise.all([
+      const [sessions, weightLogs, points, prs, challenges] = await Promise.all([
         workoutService.getSessionsInRange(userId!, startDate, endDate),
         trackingService.getWeightLogsInRange(userId!, startDate, endDate),
-        gamificationService.getDailyScoresInRange(userId!, startDate, endDate),
+        gamificationService.getPointsInRange(userId!, startDate, endDate),
         gamificationService.getPersonalRecords(userId!),
         gamificationService.getChallenges(userId!),
       ])
@@ -33,7 +33,7 @@ export function useCalendarMonth(year: number, month: number) {
             date,
             statuses: [],
             primaryStatus: 'no_workout',
-            healthScore: 0,
+            pointsEarned: 0,
             hasWorkout: false,
             hasWeightLog: false,
             hasPR: false,
@@ -56,9 +56,9 @@ export function useCalendarMonth(year: number, month: number) {
         summary.statuses.push('weight_logged')
       }
 
-      for (const s of scores) {
-        const summary = ensure(s.date)
-        summary.healthScore = s.total_score
+      for (const p of points) {
+        const summary = ensure(p.date)
+        summary.pointsEarned += p.points
       }
 
       for (const pr of prs) {

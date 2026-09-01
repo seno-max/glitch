@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { getLevelForXp } from '@/types/models'
 import type {
-  DailyScore,
   PointsLedgerEntry,
   Streak,
   StreakCategory,
@@ -13,40 +12,6 @@ import type {
 } from '@/types/database.types'
 
 export const gamificationService = {
-  // ---------------- Daily Score ----------------
-  async getDailyScore(userId: string, date: string): Promise<DailyScore | null> {
-    const { data, error } = await supabase
-      .from('daily_scores')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', date)
-      .maybeSingle()
-    if (error) throw error
-    return data as unknown as DailyScore | null
-  },
-
-  async getDailyScoresInRange(userId: string, startDate: string, endDate: string): Promise<DailyScore[]> {
-    const { data, error } = await supabase
-      .from('daily_scores')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
-    if (error) throw error
-    return (data ?? []) as unknown as DailyScore[]
-  },
-
-  async upsertDailyScore(payload: Omit<DailyScore, 'id' | 'created_at' | 'updated_at'>): Promise<DailyScore> {
-    const { data, error } = await supabase
-      .from('daily_scores')
-      .upsert(payload, { onConflict: 'user_id,date' })
-      .select('*')
-      .single()
-    if (error) throw error
-    return data as unknown as DailyScore
-  },
-
   // ---------------- Points ----------------
   async addPoints(userId: string, date: string, points: number, reason: string, meta: Record<string, unknown> = {}): Promise<PointsLedgerEntry> {
     const { data, error } = await supabase

@@ -18,7 +18,9 @@ export const authService = {
   },
 
   async signOut() {
-    const { error } = await supabase.auth.signOut()
+    // Local scope: only sign out this device, not every device the user is
+    // logged into (see auth.store.ts for rationale).
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) throw error
   },
 

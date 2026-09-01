@@ -91,6 +91,12 @@
   * {
     @apply border-border;
   }
+  :root {
+    --safe-area-inset-top: 0px;
+    --safe-area-inset-right: 0px;
+    --safe-area-inset-bottom: 0px;
+    --safe-area-inset-left: 0px;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv11", "ss01";
@@ -151,5 +157,26 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .safe-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+  .safe-header {
+    padding-top: var(--safe-area-inset-top);
+    height: calc(4rem + var(--safe-area-inset-top));
+  }
+  .safe-main {
+    padding-top: calc(4rem + var(--safe-area-inset-top));
+    padding-bottom: calc(5rem + var(--safe-area-inset-bottom));
+  }
+  .safe-bottom-nav {
+    padding-bottom: var(--safe-area-inset-bottom);
+    height: calc(4rem + var(--safe-area-inset-bottom));
+  }
+  @media (min-width: 1024px) {
+    .safe-main {
+      padding-top: 4rem;
+      padding-bottom: 1.5rem;
+    }
   }
 }

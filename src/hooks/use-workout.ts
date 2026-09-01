@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
 import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
 import { gamificationService } from '@/services/gamification.service'
+import { profileService } from '@/services/profile.service'
 import { todayStr } from '@/utils/date'
 import type { WorkoutType, StrengthExercise } from '@/types/database.types'
 import type { DraftExercise } from '@/stores/workout-log.store'
@@ -92,6 +93,8 @@ export function useSaveWorkoutLog() {
             title: input.title || null,
           })
 
+      const settings = await profileService.getSettings(user.id)
+
       // Replace exercises: delete existing (if editing) then re-insert.
       if (input.sessionId) {
         const existing = await workoutService.getStrengthExercisesBySession(input.sessionId)
@@ -120,8 +123,16 @@ export function useSaveWorkoutLog() {
         savedExercises.push(saved)
       }
 
-      await updateStreak(user.id, 'gym', input.date)
-      await awardDailyPoints(user.id, input.date, { gymCompleted: true, steps: 0 })
+      await updateStreak(user.id, 'gym', input.date, {
+        streakDays: settings?.gym_streak_days ?? 5,
+        streakPoints: settings?.gym_streak_points ?? 0,
+      })
+      await awardDailyPoints(
+        user.id,
+        input.date,
+        { gymCompleted: true },
+        { gymPoints: settings?.gym_points ?? 0, stepsPoints: 0, stepGoal: settings?.step_goal ?? 10000 }
+      )
 
       for (const ex of savedExercises) {
         await checkStrengthPR(ex)
