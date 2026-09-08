@@ -20,6 +20,19 @@ export const exerciseLibraryService = {
     return (data ?? []) as unknown as ExerciseLibraryItem[]
   },
 
+  /** Exact case-insensitive name lookup — used to check if a typed exercise
+   * name already exists in the library before prompting to save it as new. */
+  async findByExactName(name: string): Promise<ExerciseLibraryItem | null> {
+    const { data, error } = await supabase
+      .from('exercise_library')
+      .select('*')
+      .ilike('name', name.trim())
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return (data ?? null) as unknown as ExerciseLibraryItem | null
+  },
+
   async createCustom(
     userId: string,
     payload: Omit<ExerciseLibraryItem, 'id' | 'created_at' | 'updated_at' | 'is_custom' | 'created_by'>

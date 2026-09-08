@@ -34,6 +34,10 @@ export interface CalendarDaySummary {
   hasWeightLog: boolean
   hasPR: boolean
   hasChallengeCompleted: boolean
+  hasWater: boolean
+  hasFood: boolean
+  hasHabit: boolean
+  activityCount: number
 }
 
 // ----------------------------------------------------------------------------
@@ -53,6 +57,7 @@ export interface DashboardSummary {
   todaysProgress: DailyProgress
   weeklyProgress: PeriodProgress
   monthlyProgress: PeriodProgress
+  weekActivity: { date: string; active: boolean }[]
 }
 
 // ----------------------------------------------------------------------------
@@ -165,10 +170,13 @@ export interface AnalyticsSummary {
   avgWaterMl: number
   foodLoggingRatePct: number
   weightTrend: { date: string; weight: number }[]
+  stepsTrend: { date: string; steps: number }[]
+  waterTrend: { date: string; ml: number }[]
   weeklyPoints: number
   monthlyPoints: number
   pointsTrend: { date: string; points: number }[]
   workoutHeatmap: { date: string; count: number }[]
+  weeklyComparison: { weekStart: string; workouts: number; minutes: number }[]
   mostActiveDay: string | null
   bestWeek: string | null
   bestMonth: string | null

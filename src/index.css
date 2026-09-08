@@ -179,4 +179,34 @@
       padding-bottom: 1.5rem;
     }
   }
+
+  /* Shimmer skeleton — richer than a flat pulse, mimics premium loading
+     states seen in Apple Fitness / Google Fit. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background: hsl(var(--muted));
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+    animation: shimmer-sweep 1.6s infinite;
+  }
+  @keyframes shimmer-sweep {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Bottom sheet slide-up */
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.35);
+    margin: 8px auto 4px;
+  }
 }

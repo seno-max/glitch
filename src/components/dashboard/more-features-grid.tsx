@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { Droplets, Scale, Footprints, Moon, Smile, Ruler, Camera, Trophy, Target, FileText } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 // Each shortcut gets its own signature gradient — mirrors the colorful,
@@ -24,10 +24,7 @@ const features = [
 export function MoreFeaturesGrid() {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>More</CardTitle>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-5">
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {features.map((f) => (
             <NavLink

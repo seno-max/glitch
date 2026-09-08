@@ -1,7 +1,9 @@
 import type { StreakCategory } from '@/types/database.types'
 import { gamificationService } from '@/services/gamification.service'
 import { habitsService } from '@/services/habits.service'
-import { isConsecutiveDay } from '@/utils/date'
+import { streakRewardsService } from '@/services/streak-rewards.service'
+import { computeStreakFromDates, todayStr } from '@/utils/date'
+import { syncGymStreakWidget } from '@/utils/gym-streak-widget'
 import type { Habit, HabitCheckin } from '@/types/database.types'
 
 export interface PointsAwardResult {
@@ -52,50 +54,79 @@ export async function awardDailyPoints(
 }
 
 /**
- * Updates a streak category after an activity is logged for `date`.
- * The gym streak's milestone bonus length and reward are configurable
- * (settings.gym_streak_days / gym_streak_points) rather than fixed.
+ * Recomputes a streak category from the *complete* set of qualifying dates
+ * (e.g. every date the user completed a gym session, or hit their step
+ * goal) rather than incrementally mutating a saved counter. This is what
+ * makes streaks immune to out-of-order/backdated logging — e.g. logging
+ * today's workout and then going back to backfill a workout from last week
+ * will correctly leave today's streak untouched, instead of resetting it.
+ *
+ * `qualifyingDates` should include every date on record for this category,
+ * including the one just logged.
  */
 export async function updateStreak(
   userId: string,
   category: StreakCategory,
-  date: string,
-  streakConfig?: { streakDays: number; streakPoints: number }
+  qualifyingDates: string[],
+  streakConfig?: { streakDays: number; streakPoints: number; restDays?: number[] }
 ): Promise<{ streak: number; bonusAwarded: number }> {
+  const asOfDate = todayStr()
+  const restDays = streakConfig?.restDays ?? []
+  const { current, longest } = computeStreakFromDates(qualifyingDates, asOfDate, restDays)
+  const mostRecent = qualifyingDates.slice().sort().at(-1) ?? null
+
   const existing = await gamificationService.getStreak(userId, category)
-
-  if (existing?.last_logged_date === date) {
-    // Already logged today, no change
-    return { streak: existing.current_streak, bonusAwarded: 0 }
-  }
-
-  let newStreak = 1
-  if (existing && isConsecutiveDay(existing.last_logged_date, date)) {
-    newStreak = existing.current_streak + 1
-  }
-
-  const longest = Math.max(newStreak, existing?.longest_streak ?? 0)
+  const previousCurrent = existing?.current_streak ?? 0
 
   await gamificationService.upsertStreak({
     user_id: userId,
     category,
-    current_streak: newStreak,
-    longest_streak: longest,
-    last_logged_date: date,
+    current_streak: current,
+    longest_streak: Math.max(longest, existing?.longest_streak ?? 0),
+    last_logged_date: mostRecent,
   })
 
-  let bonus = 0
-  if (category === 'gym' && streakConfig && streakConfig.streakPoints > 0 && streakConfig.streakDays > 0) {
-    if (newStreak === streakConfig.streakDays) {
-      bonus = streakConfig.streakPoints
-    }
-  }
-  if (bonus > 0) {
-    await gamificationService.addPoints(userId, date, bonus, `streak_${newStreak}_days_${category}`)
-    await gamificationService.addXp(userId, bonus)
+  // Keep the home-screen "Gym Streak" widget in sync the instant the gym
+  // streak changes (workout logged, backfilled, or deleted) instead of
+  // waiting for the next dashboard load.
+  if (category === 'gym') {
+    syncGymStreakWidget(current)
   }
 
-  return { streak: newStreak, bonusAwarded: bonus }
+  // Award any *fully user-defined* streak reward for this category whose
+  // day count was just newly reached (current crossed it, previousCurrent
+  // hadn't). A single backfilled update could cross more than one
+  // threshold at once, so award every one that applies, not just the
+  // first match.
+  let bonus = 0
+  const rewards = await streakRewardsService.listForCategory(userId, category)
+  for (const reward of rewards) {
+    if (reward.points <= 0) continue
+    if (current >= reward.streak_days && previousCurrent < reward.streak_days && mostRecent) {
+      const reason = `streak_reward_${reward.id}`
+      if (!(await gamificationService.hasPointsForReason(userId, mostRecent, reason))) {
+        await gamificationService.addPoints(userId, mostRecent, reward.points, reason)
+        await gamificationService.addXp(userId, reward.points)
+        bonus += reward.points
+      }
+    }
+  }
+
+  // Legacy settings-based gym streak bonus (Settings > Rewards & Points),
+  // kept for backward compatibility alongside the newer user-defined
+  // streak_rewards above.
+  if (category === 'gym' && streakConfig && streakConfig.streakPoints > 0 && streakConfig.streakDays > 0) {
+    if (current === streakConfig.streakDays && current > previousCurrent) {
+      const reason = `streak_${current}_days_${category}`
+      if (!(await gamificationService.hasPointsForReason(userId, mostRecent ?? asOfDate, reason))) {
+        await gamificationService.addPoints(userId, mostRecent ?? asOfDate, streakConfig.streakPoints, reason)
+        await gamificationService.addXp(userId, streakConfig.streakPoints)
+        bonus += streakConfig.streakPoints
+      }
+    }
+  }
+
+  return { streak: current, bonusAwarded: bonus }
 }
 
 /**

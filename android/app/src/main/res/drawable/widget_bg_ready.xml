@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark card + emerald glow, used behind the READY pose. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#121826" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="90dp"
+                android:centerX="0.28"
+                android:centerY="0.5"
+                android:startColor="#5510b981"
+                android:centerColor="#2210b981"
+                android:endColor="#0010b981" />
+        </shape>
+    </item>
+</layer-list>

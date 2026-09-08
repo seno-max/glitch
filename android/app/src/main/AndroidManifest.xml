@@ -34,6 +34,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Gym Streak home-screen widget (2x1): shows the current gym
+             streak with the flexing gym-cat mascot; tapping it opens the app. -->
+        <receiver
+            android:name=".widget.GymStreakWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_gym_streak_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/gym_streak_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

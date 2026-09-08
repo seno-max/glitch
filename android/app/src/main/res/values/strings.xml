@@ -4,4 +4,9 @@
     <string name="title_activity_main">FitTrack</string>
     <string name="package_name">com.fittrack.app</string>
     <string name="custom_url_scheme">com.fittrack.app</string>
+
+    <!-- Gym Streak home-screen widget -->
+    <string name="widget_gym_streak_name">Gym Streak</string>
+    <string name="widget_gym_streak_description">Shows your current gym streak with the FitTrack gym cat. Tap to open the app.</string>
+    <string name="widget_gym_streak_label">day streak</string>
 </resources>

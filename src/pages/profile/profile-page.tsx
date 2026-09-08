@@ -2,16 +2,19 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Camera, Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Camera, Loader2, Flame, Star, Trophy, Target, Dumbbell, Clock, TrendingDown, TrendingUp, Award } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Avatar } from '@/components/ui/avatar'
-import { CircularProgress } from '@/components/ui/circular-progress'
+import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts'
 import { useAuthStore } from '@/stores/auth.store'
+import { useDashboard } from '@/hooks/use-dashboard'
+import { useAnalyticsSummary, useAchievements } from '@/hooks/use-analytics'
 import { profileService } from '@/services/profile.service'
-import { getLevelForXp } from '@/types/models'
+import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 const schema = z.object({
@@ -26,6 +29,14 @@ const schema = z.object({
 })
 type FormValues = z.input<typeof schema>
 type FormOutput = z.output<typeof schema>
+
+const FITNESS_GOAL_LABEL: Record<FormOutput['fitness_goal'], string> = {
+  weight_loss: 'Weight Loss',
+  muscle_gain: 'Muscle Gain',
+  maintenance: 'Maintenance',
+  endurance: 'Endurance',
+  general_fitness: 'General Fitness',
+}
 
 export default function ProfilePage() {
   const { user, profile, setProfile } = useAuthStore()
@@ -78,35 +89,114 @@ export default function ProfilePage() {
     }
   }
 
-  const xp = profile?.xp ?? 0
-  const { level, progressPct } = getLevelForXp(xp)
+  const { data: dashboard } = useDashboard()
+  const { data: yearAnalytics } = useAnalyticsSummary(365)
+  const { data: achievements } = useAchievements()
+  const gymStreak = dashboard?.currentStreaks.find((s) => s.category === 'gym')?.current_streak ?? 0
+  const unlockedAchievements = (achievements ?? []).filter((a) => a.unlocked).slice(0, 4)
+
+  const weightDiff = dashboard?.weightDifferenceKg
+  const weightIsDown = weightDiff !== null && weightDiff !== undefined && weightDiff <= 0
+  const weightSpark = (yearAnalytics?.weightTrend ?? []).slice(-14)
 
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-bold">Profile</h1>
 
-      <Card>
-        <CardContent className="p-6 flex items-center gap-6">
-          <div className="relative">
-            <Avatar src={profile?.avatar_url} fallback={profile?.full_name ?? 'U'} size={80} />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full gradient-primary text-white shadow-lg"
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-          </div>
-          <div className="flex-1">
-            <p className="text-lg font-bold">{profile?.full_name}</p>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
-          </div>
-          <CircularProgress value={progressPct} max={100} size={64} strokeWidth={6}>
-            <span className="text-sm font-bold">L{level}</span>
-          </CircularProgress>
-        </CardContent>
-      </Card>
+      {/* Header banner */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="relative overflow-hidden gradient-hero text-white border-0 shadow-xl">
+          <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full gradient-primary opacity-25 blur-2xl" />
+          <div className="absolute -left-10 bottom-0 h-48 w-48 rounded-full gradient-secondary opacity-20 blur-2xl" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="relative shrink-0">
+              <Avatar src={profile?.avatar_url} fallback={profile?.full_name ?? 'U'} size={76} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full gradient-primary text-white shadow-lg ring-2 ring-white/20"
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-bold truncate">{profile?.full_name}</p>
+              <p className="text-sm text-white/60 truncate">{user?.email}</p>
+              {profile?.fitness_goal && (
+                <span className="inline-flex items-center gap-1.5 mt-2 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-xs font-semibold">
+                  <Target className="size-3" /> {FITNESS_GOAL_LABEL[profile.fitness_goal]}
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Streak / points stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile icon={Flame} value={gymStreak} label="Day Streak" gradient="from-orange-400 to-pink-500" />
+        <StatTile icon={Trophy} value={dashboard?.pointsToday ?? 0} label="Points Today" gradient="from-amber-400 to-orange-500" />
+        <StatTile icon={Star} value={dashboard?.totalPoints ?? 0} label="Total Points" gradient="from-fuchsia-400 to-purple-600" />
+      </div>
+
+      {/* Fitness summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatTile icon={Dumbbell} value={yearAnalytics?.workoutHours ? Math.round((yearAnalytics.workoutHours / 1) * 10) / 10 : 0} valueSuffix="h" label="Total Hours" gradient="from-emerald-400 to-teal-600" />
+        <StatTile icon={Clock} value={yearAnalytics?.avgWorkoutMinutes ?? 0} valueSuffix="min" label="Avg Session" gradient="from-sky-400 to-blue-600" />
+        <StatTile icon={Award} value={unlockedAchievements.length} label="Achievements" gradient="from-violet-400 to-purple-600" />
+      </div>
+
+      {/* Weight progress */}
+      {(profile?.current_weight_kg || profile?.goal_weight_kg) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {weightIsDown ? <TrendingDown className="size-4 text-emerald-500" /> : <TrendingUp className="size-4 text-rose-500" />} Weight Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-2xl font-bold">{dashboard?.currentWeightKg?.toFixed(1) ?? '—'} kg</p>
+                <p className="text-xs text-muted-foreground">
+                  Goal: {dashboard?.goalWeightKg?.toFixed(1) ?? '—'} kg
+                  {weightDiff !== null && weightDiff !== undefined && ` · ${Math.abs(weightDiff).toFixed(1)} kg to go`}
+                </p>
+              </div>
+            </div>
+            {weightSpark.length > 1 && (
+              <div className="h-16">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={weightSpark}>
+                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} hide />
+                    <Line type="monotone" dataKey="weight" stroke={weightIsDown ? '#10b981' : '#f43f5e'} strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Achievement showcase */}
+      {unlockedAchievements.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="size-4 text-amber-500" /> Achievement Showcase
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-4 gap-3">
+            {unlockedAchievements.map((a) => (
+              <div key={a.id} className="flex flex-col items-center gap-1.5 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl gradient-fire text-xl shadow-md">{a.icon}</div>
+                <p className="text-[11px] font-medium leading-tight line-clamp-2">{a.name}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card>
@@ -171,5 +261,34 @@ export default function ProfilePage() {
         </Card>
       </form>
     </div>
+  )
+}
+
+function StatTile({
+  icon: Icon,
+  value,
+  valueSuffix,
+  label,
+  gradient,
+}: {
+  icon: typeof Flame
+  value: number
+  valueSuffix?: string
+  label: string
+  gradient: string
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br shadow-md', gradient)}>
+          <Icon className="size-5 text-white" />
+        </div>
+        <p className="text-lg font-bold">
+          {value}
+          {valueSuffix}
+        </p>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
   )
 }

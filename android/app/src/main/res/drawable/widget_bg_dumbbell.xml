@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark card + blue glow, used behind the DUMBBELL pose. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#121826" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="90dp"
+                android:centerX="0.28"
+                android:centerY="0.5"
+                android:startColor="#553b82f6"
+                android:centerColor="#223b82f6"
+                android:endColor="#003b82f6" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Dumbbell,
@@ -13,11 +14,16 @@ import {
   Bell,
   Menu,
   User,
+  Flame,
+  Loader2,
+  ArrowDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore } from '@/stores/ui.store'
+import { useDashboard } from '@/hooks/use-dashboard'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { useState } from 'react'
 
 const mainNav = [
@@ -74,10 +80,33 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">{children}</p>
 }
 
+function SidebarMotivation() {
+  const { data } = useDashboard()
+  const gymStreak = data?.currentStreaks.find((s) => s.category === 'gym')?.current_streak ?? 0
+
+  if (!data) return <p className="text-xs text-muted-foreground">Welcome back</p>
+
+  if (gymStreak > 0) {
+    return (
+      <p className="text-xs text-orange-500 font-medium flex items-center gap-1">
+        <Flame className="size-3" /> {gymStreak} day streak
+      </p>
+    )
+  }
+  if (data.pointsToday > 0) {
+    return <p className="text-xs text-muted-foreground">✨ {data.pointsToday} pts today</p>
+  }
+  return <p className="text-xs text-muted-foreground">Ready to log today?</p>
+}
+
 export function AppShell() {
   const { profile } = useAuthStore()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const { containerRef, pullDistance, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries()
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,7 +130,7 @@ export function AppShell() {
             <Avatar src={profile?.avatar_url} fallback={profile?.full_name ?? 'U'} size={36} />
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-semibold truncate">{profile?.full_name ?? 'Athlete'}</p>
-              <p className="text-xs text-muted-foreground">Level {profile?.level ?? 1}</p>
+              <SidebarMotivation />
             </div>
           </NavLink>
         </div>
@@ -173,7 +202,17 @@ export function AppShell() {
       </AnimatePresence>
 
       {/* Main content */}
-      <main className="safe-main lg:pl-64 min-h-screen">
+      <main ref={containerRef} className="safe-main lg:pl-64 min-h-screen">
+        <div
+          className="lg:hidden flex items-center justify-center overflow-hidden transition-all"
+          style={{ height: pullDistance, opacity: pullDistance > 0 ? 1 : 0 }}
+        >
+          {refreshing ? (
+            <Loader2 className="size-5 text-primary animate-spin" />
+          ) : (
+            <ArrowDown className={cn('size-5 text-muted-foreground transition-transform', pullDistance > 70 && 'rotate-180 text-primary')} />
+          )}
+        </div>
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}

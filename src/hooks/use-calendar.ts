@@ -3,6 +3,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
 import { trackingService } from '@/services/tracking.service'
 import { gamificationService } from '@/services/gamification.service'
+import { nutritionService } from '@/services/nutrition.service'
+import { habitsService } from '@/services/habits.service'
 import type { CalendarDaySummary, CalendarDayStatus } from '@/types/models'
 
 export function useCalendarMonth(year: number, month: number) {
@@ -17,12 +19,15 @@ export function useCalendarMonth(year: number, month: number) {
     queryKey: ['calendar-month', userId, year, month],
     enabled: !!userId,
     queryFn: async () => {
-      const [sessions, weightLogs, points, prs, challenges] = await Promise.all([
+      const [sessions, weightLogs, points, prs, challenges, waterLogs, meals, checkins] = await Promise.all([
         workoutService.getSessionsInRange(userId!, startDate, endDate),
         trackingService.getWeightLogsInRange(userId!, startDate, endDate),
         gamificationService.getPointsInRange(userId!, startDate, endDate),
         gamificationService.getPersonalRecords(userId!),
         gamificationService.getChallenges(userId!),
+        trackingService.getWaterLogsInRange(userId!, startDate, endDate),
+        nutritionService.getMealsInRange(userId!, startDate, endDate),
+        habitsService.getCheckinsInRange(userId!, startDate, endDate),
       ])
 
       const summaries: Record<string, CalendarDaySummary> = {}
@@ -38,6 +43,10 @@ export function useCalendarMonth(year: number, month: number) {
             hasWeightLog: false,
             hasPR: false,
             hasChallengeCompleted: false,
+            hasWater: false,
+            hasFood: false,
+            hasHabit: false,
+            activityCount: 0,
           }
         }
         return summaries[date]
@@ -80,10 +89,21 @@ export function useCalendarMonth(year: number, month: number) {
         }
       }
 
+      for (const w of waterLogs) {
+        ensure(w.date).hasWater = true
+      }
+      for (const m of meals) {
+        ensure(m.date).hasFood = true
+      }
+      for (const c of checkins) {
+        ensure(c.date).hasHabit = true
+      }
+
       // Determine primary status by priority: PR > challenge > gym > weight > rest > no_workout
       const priority: CalendarDayStatus[] = ['personal_record', 'challenge_completed', 'gym_completed', 'weight_logged', 'rest_day', 'no_workout']
       for (const summary of Object.values(summaries)) {
         summary.primaryStatus = priority.find((p) => summary.statuses.includes(p)) ?? 'no_workout'
+        summary.activityCount = [summary.hasWorkout, summary.hasWeightLog, summary.hasWater, summary.hasFood, summary.hasHabit].filter(Boolean).length
       }
 
       return summaries

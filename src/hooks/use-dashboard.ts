@@ -5,7 +5,8 @@ import { trackingService } from '@/services/tracking.service'
 import { gamificationService } from '@/services/gamification.service'
 import { profileService } from '@/services/profile.service'
 import { habitsService } from '@/services/habits.service'
-import { todayStr, getGreeting, weekRange, monthRange } from '@/utils/date'
+import { todayStr, getGreeting, weekRange, monthRange, currentWeekDays } from '@/utils/date'
+import { syncGymStreakWidget } from '@/utils/gym-streak-widget'
 import type { DashboardSummary, HabitProgress, PeriodProgress } from '@/types/models'
 
 export function useDashboard() {
@@ -38,6 +39,7 @@ export function useDashboard() {
         weekWeights,
         monthWeights,
         totalPoints,
+        weekCheckins,
       ] = await Promise.all([
         workoutService.getSessionsByDate(userId!, date),
         trackingService.getLatestWeightLog(userId!),
@@ -56,6 +58,7 @@ export function useDashboard() {
         trackingService.getWeightLogsInRange(userId!, week.start, week.end),
         trackingService.getWeightLogsInRange(userId!, month.start, month.end),
         gamificationService.getTotalPoints(userId!),
+        habitsService.getCheckinsInRange(userId!, week.start, week.end),
       ])
 
       const pointsToday = await gamificationService.getPointsForDate(userId!, date)
@@ -110,6 +113,23 @@ export function useDashboard() {
         }
       }
 
+      // Weekly consistency strip — a day counts as "active" if the user
+      // logged anything at all that day (workout, water, steps, weight, or a
+      // habit check-in). This is the motivating "did I show up" signal,
+      // deliberately not tied to any goal/threshold.
+      const activeDates = new Set<string>()
+      for (const s of weekSessions) activeDates.add(s.date)
+      for (const w of weekWater) activeDates.add(w.date)
+      for (const s of weekSteps) if (s.steps > 0) activeDates.add(s.date)
+      for (const w of weekWeights) activeDates.add(w.date)
+      for (const c of weekCheckins) activeDates.add(c.date)
+      const weekActivity = currentWeekDays().map((d) => ({ date: d, active: activeDates.has(d) }))
+
+      // Keep the home-screen "Gym Streak" widget in sync every time the
+      // dashboard is loaded (best-effort, no-op on web).
+      const gymStreak = streaks.find((s) => s.category === 'gym')?.current_streak ?? 0
+      syncGymStreakWidget(gymStreak)
+
       return {
         greeting: getGreeting(),
         date,
@@ -130,6 +150,7 @@ export function useDashboard() {
         },
         weeklyProgress: buildPeriodProgress('This Week', weekSessions, weekSteps, weekWater, weekWeights),
         monthlyProgress: buildPeriodProgress('This Month', monthSessions, monthSteps, monthWater, monthWeights),
+        weekActivity,
       }
     },
     staleTime: 30_000,

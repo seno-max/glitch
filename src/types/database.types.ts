@@ -118,6 +118,26 @@ export interface Settings {
   steps_points: number
   gym_streak_days: number
   gym_streak_points: number
+  // Weekdays (0=Sunday..6=Saturday) that never break the gym streak when
+  // skipped — fully user-defined rest days.
+  rest_days: number[]
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * A fully user-defined streak reward: pick a name, which streak category
+ * it applies to, how many consecutive days are required, and how many
+ * bonus points to award once reached. Not limited to any built-in
+ * template — users can create as many of these as they want.
+ */
+export interface StreakReward {
+  id: string
+  user_id: string
+  name: string
+  category: StreakCategory
+  streak_days: number
+  points: number
   created_at: string
   updated_at: string
 }
@@ -217,6 +237,7 @@ export interface StrengthExercise {
   rest_seconds: number | null
   rpe: number | null
   duration_seconds: number | null
+  duration_unit: 'sec' | 'min'
   distance_km: number | null
   notes: string | null
   volume_kg: number | null

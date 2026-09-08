@@ -1,11 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Minus, Check, ListChecks } from 'lucide-react'
+import { Plus, Minus, ListChecks, PartyPopper } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '@/components/shared/empty-state'
+import { AnimatedCheckbox } from '@/components/ui/animated-checkbox'
 import { useCheckInHabit, useUncheckHabit } from '@/hooks/use-habits'
+import { celebrateBig } from '@/utils/confetti'
 import type { HabitProgress } from '@/types/models'
 
 // Rotating palette so habit tiles feel lively even before a user picks a
@@ -30,12 +33,35 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
   const navigate = useNavigate()
   const checkIn = useCheckInHabit()
   const uncheck = useUncheckHabit()
+  const allDone = habitsToday.length > 0 && habitsToday.every((h) => h.completed)
+  // Tracks whether we've already fired the celebration for *this specific*
+  // all-done moment. Initialized from the current state (not `false`) so
+  // reopening the app after habits were already completed earlier does
+  // NOT replay the confetti — it only fires the instant the last habit is
+  // actually checked off during this session.
+  const wasAllDone = useRef(allDone)
+  const hasMounted = useRef(false)
+
+  useEffect(() => {
+    if (!hasMounted.current) {
+      // Skip the transition check on the very first render — allDone here
+      // reflects whatever was already true/false on load, not a fresh
+      // completion.
+      hasMounted.current = true
+      wasAllDone.current = allDone
+      return
+    }
+    if (allDone && !wasAllDone.current) {
+      celebrateBig()
+    }
+    wasAllDone.current = allDone
+  }, [allDone])
 
   return (
-    <Card>
+    <Card className={cn('relative overflow-hidden transition-colors', allDone && 'ring-1 ring-emerald-400/40')}>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
-          <ListChecks className="size-4" /> My Habits
+          {allDone ? <PartyPopper className="size-4 text-emerald-500" /> : <ListChecks className="size-4" />} My Habits
         </CardTitle>
         {habitsToday.length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>
@@ -44,6 +70,15 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
         )}
       </CardHeader>
       <CardContent className="space-y-1">
+        {allDone && (
+          <motion.p
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-sm font-semibold text-emerald-500 mb-2 flex items-center gap-1.5"
+          >
+            <PartyPopper className="size-4" /> All habits done for today!
+          </motion.p>
+        )}
         {habitsToday.length === 0 ? (
           <EmptyState
             icon={ListChecks}
@@ -88,15 +123,13 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
                     <Minus className="size-3.5" />
                   </Button>
                 )}
-                <Button
-                  variant={hp.completed ? 'default' : 'gradient'}
-                  size="icon-sm"
-                  onClick={() => checkIn.mutate(hp.habit)}
+                <AnimatedCheckbox
+                  checked={hp.completed}
+                  onToggle={() => checkIn.mutate(hp.habit)}
                   disabled={checkIn.isPending || hp.checkedCount >= hp.habit.target_count}
-                  title="Check in"
-                >
-                  <Check className="size-3.5" />
-                </Button>
+                  gradient={HABIT_GRADIENTS[i % HABIT_GRADIENTS.length].replace('from-', 'bg-gradient-to-br from-')}
+                  size={30}
+                />
               </div>
             </motion.div>
           ))

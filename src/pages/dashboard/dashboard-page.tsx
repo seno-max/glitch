@@ -1,15 +1,20 @@
+import { useState } from 'react'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { HeroHealthCard } from '@/components/dashboard/hero-health-card'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { HabitsCard } from '@/components/dashboard/habits-card'
 import { TodaysProgress } from '@/components/dashboard/todays-progress'
 import { PeriodProgressCard } from '@/components/dashboard/period-progress-card'
+import { WeeklyRecapCard } from '@/components/dashboard/weekly-recap-card'
+import { SmartSuggestions } from '@/components/dashboard/smart-suggestions'
 import { MoreFeaturesGrid } from '@/components/dashboard/more-features-grid'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDisplayDate } from '@/utils/date'
 
 export default function DashboardPage() {
   const { data, isLoading } = useDashboard()
+  const [period, setPeriod] = useState<'week' | 'month'>('week')
 
   if (isLoading || !data) {
     return (
@@ -36,21 +41,38 @@ export default function DashboardPage() {
       </div>
 
       <div>
+        <h2 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Today's Progress</h2>
+        <TodaysProgress progress={data.todaysProgress} />
+      </div>
+
+      <WeeklyRecapCard progress={data.weeklyProgress} streaks={data.currentStreaks} />
+
+      <SmartSuggestions progress={data.todaysProgress} />
+
+      <div>
         <h2 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Quick Actions</h2>
         <QuickActions />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <HabitsCard habitsToday={data.habitsToday} />
-        <TodaysProgress progress={data.todaysProgress} />
+      <HabitsCard habitsToday={data.habitsToday} />
+
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-sm font-semibold text-muted-foreground">Your Progress</h2>
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+            <TabsList>
+              <TabsTrigger value="week">Week</TabsTrigger>
+              <TabsTrigger value="month">Month</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        <PeriodProgressCard progress={period === 'week' ? data.weeklyProgress : data.monthlyProgress} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <PeriodProgressCard progress={data.weeklyProgress} />
-        <PeriodProgressCard progress={data.monthlyProgress} />
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Explore</h2>
+        <MoreFeaturesGrid />
       </div>
-
-      <MoreFeaturesGrid />
     </div>
   )
 }

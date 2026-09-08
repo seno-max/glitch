@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Moon, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useSleepHistory, useLogSleep } from '@/hooks/use-tracking'
 import { trackingService } from '@/services/tracking.service'
 import { useQueryClient } from '@tanstack/react-query'
-import { todayStr } from '@/utils/date'
+import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO } from 'date-fns'
 import type { SleepQuality } from '@/types/database.types'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -24,19 +25,37 @@ const QUALITY_EMOJI: Record<SleepQuality, string> = {
 }
 
 export default function SleepPage() {
+  const [searchParams] = useSearchParams()
   const { data: history } = useSleepHistory(60)
   const logSleep = useLogSleep()
   const queryClient = useQueryClient()
 
-  const [date, setDate] = useState(todayStr())
+  const [date, setDate] = useState(searchParams.get('date') ?? todayStr())
   const [sleepTime, setSleepTime] = useState('23:00')
   const [wakeTime, setWakeTime] = useState('07:00')
   const [quality, setQuality] = useState<SleepQuality>('good')
+
+  // If a specific day was opened from the calendar/day-detail page,
+  // prefill the form with whatever's already logged for that date so
+  // editing feels like editing, not re-entering from scratch.
+  useEffect(() => {
+    const paramDate = searchParams.get('date')
+    if (!paramDate || !history) return
+    const existing = history.find((h) => h.date === paramDate)
+    if (existing) {
+      if (existing.sleep_time) setSleepTime(format(new Date(existing.sleep_time), 'HH:mm'))
+      if (existing.wake_time) setWakeTime(format(new Date(existing.wake_time), 'HH:mm'))
+      if (existing.quality) setQuality(existing.quality)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history])
 
   const sorted = (history ?? []).slice().sort((a, b) => (a.date < b.date ? -1 : 1))
   const avgSleep = sorted.length ? sorted.reduce((s, d) => s + (d.hours_slept ?? 0), 0) / sorted.length : 0
 
   const chartData = sorted.map((d) => ({ date: format(parseISO(d.date), 'MMM d'), hours: d.hours_slept ?? 0 }))
+
+  const editable = isWithinEditWindow(date)
 
   const handleLog = async () => {
     const sleepDateTime = new Date(`${date}T${sleepTime}:00`)
@@ -55,6 +74,10 @@ export default function SleepPage() {
   const handleDelete = async (id: string) => {
     await trackingService.deleteSleepLog(id)
     queryClient.invalidateQueries({ queryKey: ['sleep-history'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+    queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
     toast.success('Sleep entry deleted')
   }
 
@@ -73,7 +96,7 @@ export default function SleepPage() {
         <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
             <Label className="text-xs">Date</Label>
-            <Input type="date" max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input type="date" min={earliestEditableDate()} max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div>
             <Label className="text-xs">Sleep Time</Label>
@@ -93,7 +116,7 @@ export default function SleepPage() {
               <option value="very_poor">Very Poor</option>
             </Select>
           </div>
-          <Button variant="gradient" className="col-span-2 sm:col-span-4" onClick={handleLog} disabled={logSleep.isPending}>
+          <Button variant="gradient" className="col-span-2 sm:col-span-4" onClick={handleLog} disabled={!editable || logSleep.isPending}>
             Save Sleep Log
           </Button>
         </CardContent>
@@ -136,28 +159,33 @@ export default function SleepPage() {
             <EmptyState icon={Moon} title="No logs yet" />
           ) : (
             <div className="space-y-1">
-              {recent.map((log) => (
-                <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span>{log.quality ? QUALITY_EMOJI[log.quality] : '🛏️'}</span>
-                    <div>
-                      <p className="text-sm font-medium">{format(parseISO(log.date), 'MMM d, yyyy')}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{log.quality?.replace('_', ' ') ?? '—'}</p>
+              {recent.map((log) => {
+                const rowEditable = isWithinEditWindow(log.date)
+                return (
+                  <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span>{log.quality ? QUALITY_EMOJI[log.quality] : '🛏️'}</span>
+                      <div>
+                        <p className="text-sm font-medium">{format(parseISO(log.date), 'MMM d, yyyy')}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{log.quality?.replace('_', ' ') ?? '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold">{log.hours_slept?.toFixed(1) ?? '—'}h</p>
+                      {rowEditable && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDelete(log.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold">{log.hours_slept?.toFixed(1) ?? '—'}h</p>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(log.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

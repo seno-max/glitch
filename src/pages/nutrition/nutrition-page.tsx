@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Trash2, Star, Coffee, Sun, Cookie, Moon, GlassWater, Milk, Pill, Sandwich } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { useMealsForDate, useAddMeal, useDeleteMeal } from '@/hooks/use-nutrition'
-import { todayStr, formatDisplayDate } from '@/utils/date'
+import { todayStr, earliestEditableDate, isWithinEditWindow, formatDisplayDate } from '@/utils/date'
 import type { MealType } from '@/types/database.types'
 
 const MEAL_SECTIONS: { type: MealType; label: string; icon: typeof Coffee }[] = [
@@ -21,13 +23,15 @@ const MEAL_SECTIONS: { type: MealType; label: string; icon: typeof Coffee }[] = 
 ]
 
 export default function NutritionPage() {
-  const date = todayStr()
+  const [searchParams] = useSearchParams()
+  const [date, setDate] = useState(searchParams.get('date') ?? todayStr())
   const { data: meals, isLoading } = useMealsForDate(date)
   const addMeal = useAddMeal()
   const deleteMeal = useDeleteMeal()
   const [dialogMealType, setDialogMealType] = useState<MealType | null>(null)
   const [form, setForm] = useState({ name: '', quantity: '' })
 
+  const editable = isWithinEditWindow(date)
   const resetForm = () => setForm({ name: '', quantity: '' })
 
   const handleAdd = async () => {
@@ -58,6 +62,11 @@ export default function NutritionPage() {
         <p className="text-sm text-muted-foreground">{formatDisplayDate(date)}</p>
       </div>
 
+      <div className="max-w-xs">
+        <Label className="text-xs">Date</Label>
+        <Input type="date" min={earliestEditableDate()} max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4">
         {MEAL_SECTIONS.map((section, i) => {
           const sectionMeals = (meals ?? []).filter((m) => m.meal_type === section.type)
@@ -69,9 +78,11 @@ export default function NutritionPage() {
                     <section.icon className="size-4 text-muted-foreground" />
                     {section.label}
                   </CardTitle>
-                  <Button variant="ghost" size="icon-sm" onClick={() => setDialogMealType(section.type)}>
-                    <Plus className="size-4" />
-                  </Button>
+                  {editable && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => setDialogMealType(section.type)}>
+                      <Plus className="size-4" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-1.5">
                   {isLoading ? (
@@ -85,9 +96,11 @@ export default function NutritionPage() {
                           <p className="font-medium">{meal.food_name}</p>
                           {meal.quantity && <p className="text-xs text-muted-foreground">{meal.quantity}</p>}
                         </div>
-                        <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        {editable && (
+                          <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))
                   )}

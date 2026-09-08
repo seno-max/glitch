@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static preview shown in the widget picker: dark card + violet glow + celebratory cycling pose. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/widget_bg_cycling" />
+    <item
+        android:drawable="@drawable/cat_pose_cycling"
+        android:gravity="center"
+        android:width="84dp"
+        android:height="84dp" />
+</layer-list>

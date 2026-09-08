@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Save, Dumbbell, LogIn, LogOut, Hourglass, Trash2 } from 'lucide-react'
+import { Save, Dumbbell, LogIn, LogOut, Hourglass, Trash2, ClipboardList } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ExerciseLogger } from '@/components/workout/exercise-logger'
+import { WorkoutSummaryModal, type WorkoutSummaryData } from '@/components/workout/workout-summary-modal'
+import { TemplatePickerSheet } from '@/components/workout/template-picker-sheet'
 import { useWorkoutLogStore } from '@/stores/workout-log.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSaveWorkoutLog, useWorkoutSessionDetail, useDeleteWorkoutSession } from '@/hooks/use-workout'
 import { WORKOUT_TYPES } from '@/constants/workout'
 import { cn } from '@/lib/utils'
-import { formatDurationHM, todayStr } from '@/utils/date'
+import { formatDurationHM, todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import type { WorkoutType } from '@/types/database.types'
 import toast from 'react-hot-toast'
 
@@ -35,6 +38,7 @@ function computeDurationLabel(date: string, entryTime: string, exitTime: string)
 export default function WorkoutLogPage() {
   const navigate = useNavigate()
   const { sessionId } = useParams<{ sessionId: string }>()
+  const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
   const isEditing = !!sessionId
 
@@ -45,10 +49,18 @@ export default function WorkoutLogPage() {
   const saveWorkoutLog = useSaveWorkoutLog()
   const deleteWorkoutSession = useDeleteWorkoutSession()
   const [loaded, setLoaded] = useState(!isEditing)
+  const [summary, setSummary] = useState<WorkoutSummaryData | null>(null)
+  const [pendingNavigateDate, setPendingNavigateDate] = useState<string | null>(null)
+  const [templateSheetOpen, setTemplateSheetOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!isEditing) {
       reset()
+      // If opened from the day-detail page for a specific past (but still
+      // editable) day, prefill that date instead of today.
+      const paramDate = searchParams.get('date')
+      if (paramDate) setDate(paramDate)
       setLoaded(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,10 +79,12 @@ export default function WorkoutLogPage() {
           tempId: ex.id,
           exercise_name: ex.exercise_name,
           equipment: ex.equipment,
+          isMachineCardio: ex.equipment === 'machine' && !ex.sets && !ex.reps,
           weight_kg: ex.weight_kg || null,
-          sets: ex.sets,
+          sets: ex.sets || null,
           reps: ex.reps || null,
           duration_seconds: ex.duration_seconds,
+          duration_unit: ex.duration_unit ?? 'sec',
           distance_km: ex.distance_km,
           rest_seconds: ex.rest_seconds,
           rpe: ex.rpe,
@@ -83,7 +97,7 @@ export default function WorkoutLogPage() {
 
   const durationLabel = computeDurationLabel(date, entryTime, exitTime)
 
-  const canSave = date && entryTime && exitTime && workoutTypes.length > 0 && !!durationLabel
+  const canSave = date && entryTime && exitTime && workoutTypes.length > 0 && !!durationLabel && isWithinEditWindow(date)
 
   const handleSave = async () => {
     if (!user || !canSave) {
@@ -91,9 +105,9 @@ export default function WorkoutLogPage() {
       return
     }
     try {
-      await saveWorkoutLog.mutateAsync({ sessionId, date, entryTime, exitTime, workoutTypes, title, exercises })
-      reset()
-      navigate(`/calendar/${date}`)
+      const result = await saveWorkoutLog.mutateAsync({ sessionId, date, entryTime, exitTime, workoutTypes, title, exercises })
+      setPendingNavigateDate(result.summary.date)
+      setSummary(result.summary)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save workout')
     }
@@ -102,6 +116,8 @@ export default function WorkoutLogPage() {
   if (isEditing && loadingSession && !loaded) {
     return <p className="text-sm text-muted-foreground text-center py-12">Loading workout...</p>
   }
+
+  const readOnly = isEditing && !!sessionDetail?.session && !isWithinEditWindow(sessionDetail.session.date)
 
   const handleDelete = async () => {
     if (!sessionId) return
@@ -134,8 +150,10 @@ export default function WorkoutLogPage() {
                 <label className="text-xs text-white/70">Date</label>
                 <Input
                   type="date"
+                  min={earliestEditableDate()}
                   max={todayStr()}
                   value={date}
+                  disabled={readOnly}
                   onChange={(e) => setDate(e.target.value)}
                   className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                 />
@@ -147,6 +165,7 @@ export default function WorkoutLogPage() {
                 <Input
                   type="time"
                   value={entryTime}
+                  disabled={readOnly}
                   onChange={(e) => setEntryTime(e.target.value)}
                   className="bg-white/10 border-white/20 text-white"
                 />
@@ -158,6 +177,7 @@ export default function WorkoutLogPage() {
                 <Input
                   type="time"
                   value={exitTime}
+                  disabled={readOnly}
                   onChange={(e) => setExitTime(e.target.value)}
                   className="bg-white/10 border-white/20 text-white"
                 />
@@ -168,8 +188,13 @@ export default function WorkoutLogPage() {
       </motion.div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle>What did you train?</CardTitle>
+          {!isEditing && (
+            <Button variant="outline" size="sm" onClick={() => setTemplateSheetOpen(true)}>
+              <ClipboardList className="size-3.5" /> From Template
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -178,9 +203,10 @@ export default function WorkoutLogPage() {
               return (
                 <button
                   key={wt.type}
+                  disabled={readOnly}
                   onClick={() => toggleWorkoutType(wt.type)}
                   className={cn(
-                    'flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all',
+                    'flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all disabled:opacity-50 disabled:pointer-events-none',
                     selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                   )}
                 >
@@ -192,7 +218,7 @@ export default function WorkoutLogPage() {
               )
             })}
           </div>
-          <Input placeholder="Title (optional, e.g. Push Day)" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input placeholder="Title (optional, e.g. Push Day)" value={title} disabled={readOnly} onChange={(e) => setTitle(e.target.value)} />
           {workoutTypes.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {workoutTypes.map((t: WorkoutType) => (
@@ -203,18 +229,39 @@ export default function WorkoutLogPage() {
         </CardContent>
       </Card>
 
-      <ExerciseLogger />
+      <ExerciseLogger readOnly={readOnly} />
 
-      <div className="flex gap-3">
-        {isEditing && (
-          <Button variant="outline" size="lg" onClick={handleDelete} disabled={deleteWorkoutSession.isPending}>
-            <Trash2 className="size-4" /> Delete
+      {!readOnly && (
+        <div className="flex gap-3">
+          {isEditing && (
+            <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteWorkoutSession.isPending}>
+              <Trash2 className="size-4" /> Delete
+            </Button>
+          )}
+          <Button variant="gradient" size="lg" className="flex-1" onClick={handleSave} disabled={!canSave || saveWorkoutLog.isPending}>
+            <Save className="size-4" /> {saveWorkoutLog.isPending ? 'Saving...' : isEditing ? 'Update Workout' : 'Save Workout'}
           </Button>
-        )}
-        <Button variant="gradient" size="lg" className="flex-1" onClick={handleSave} disabled={!canSave || saveWorkoutLog.isPending}>
-          <Save className="size-4" /> {saveWorkoutLog.isPending ? 'Saving...' : isEditing ? 'Update Workout' : 'Save Workout'}
-        </Button>
-      </div>
+        </div>
+      )}
+
+      <WorkoutSummaryModal
+        data={summary}
+        open={!!summary}
+        onClose={() => {
+          setSummary(null)
+          reset()
+          if (pendingNavigateDate) navigate(`/calendar/${pendingNavigateDate}`)
+        }}
+      />
+      <TemplatePickerSheet open={templateSheetOpen} onClose={() => setTemplateSheetOpen(false)} />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this workout?"
+        description="This will permanently remove this workout log and all its exercises. This can't be undone."
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

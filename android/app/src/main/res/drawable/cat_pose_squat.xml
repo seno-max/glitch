@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Gym-cat mascot, pose: SQUAT (streak 5-6 days, deep into the grind).
+  Deep squat with a barbell across the shoulders, bent knees, low hips,
+  wide braced stance, arms up gripping the bar.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Tail -->
+    <path android:pathData="M144,168 C164,162 172,144 162,130 C156,122 146,123 143,130"
+        android:strokeColor="#92400e" android:strokeWidth="14" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M144,168 C164,162 172,144 162,130 C156,122 146,123 143,130"
+        android:strokeColor="#f59e0b" android:strokeWidth="9" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Deep-bent legs, wide squat stance -->
+    <path android:pathData="M64,186 C60,168 66,154 82,150" android:strokeColor="#92400e" android:strokeWidth="22" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M64,186 C60,168 66,154 82,150" android:strokeColor="#f59e0b" android:strokeWidth="16" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M136,186 C140,168 134,154 118,150" android:strokeColor="#92400e" android:strokeWidth="22" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M136,186 C140,168 134,154 118,150" android:strokeColor="#f59e0b" android:strokeWidth="16" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M50,190 A11,7 0 1 1 72,190 A11,7 0 1 1 50,190 Z" android:fillColor="#92400e" />
+    <path android:pathData="M128,190 A11,7 0 1 1 150,190 A11,7 0 1 1 128,190 Z" android:fillColor="#92400e" />
+
+    <!-- Barbell across the shoulders -->
+    <path android:pathData="M50,88 L150,88" android:strokeColor="#111827" android:strokeWidth="9" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M40,72 L40,104" android:strokeColor="#111827" android:strokeWidth="20" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M40,72 L40,104" android:strokeColor="#374151" android:strokeWidth="13" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M160,72 L160,104" android:strokeColor="#111827" android:strokeWidth="20" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M160,72 L160,104" android:strokeColor="#374151" android:strokeWidth="13" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Arms gripping the bar -->
+    <path android:pathData="M74,132 L64,90" android:strokeColor="#92400e" android:strokeWidth="16" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M74,132 L64,90" android:strokeColor="#f59e0b" android:strokeWidth="11" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M126,132 L136,90" android:strokeColor="#92400e" android:strokeWidth="16" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M126,132 L136,90" android:strokeColor="#f59e0b" android:strokeWidth="11" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Torso, low and braced -->
+    <path android:pathData="M66,158 C60,126 70,100 100,98 C130,100 140,126 134,158 C130,176 114,186 100,184 C86,186 70,176 66,158 Z"
+        android:fillColor="#f59e0b" android:strokeColor="#92400e" android:strokeWidth="7" />
+
+    <!-- Belly patch -->
+    <path android:pathData="M84,128 C82,148 86,168 100,170 C114,168 118,148 116,128 C114,117 108,111 100,111 C92,111 86,117 84,128 Z"
+        android:fillColor="#fef3c7" />
+
+    <!-- Head, chin up, straining -->
+    <path android:pathData="M58,70 A42,38 0 1 1 142,70 A42,38 0 1 1 58,70 Z"
+        android:fillColor="#f59e0b" android:strokeColor="#92400e" android:strokeWidth="7" />
+
+    <!-- Ears -->
+    <path android:pathData="M64,44 L74,16 L90,46 Z" android:fillColor="#f59e0b" android:strokeColor="#92400e" android:strokeWidth="7" />
+    <path android:pathData="M136,44 L126,16 L110,46 Z" android:fillColor="#f59e0b" android:strokeColor="#92400e" android:strokeWidth="7" />
+
+    <!-- Muzzle -->
+    <path android:pathData="M76,80 A24,17 0 1 1 124,80 A24,17 0 1 1 76,80 Z" android:fillColor="#fef3c7" />
+
+    <!-- Strained squeezed-shut eyes (max effort) -->
+    <path android:pathData="M74,62 L92,62" android:strokeColor="#4a2907" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M108,62 L126,62" android:strokeColor="#4a2907" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Nose + clenched effort mouth -->
+    <path android:pathData="M92,80 L108,80 L100,90 Z" android:fillColor="#dc2626" />
+    <path android:pathData="M88,94 L112,94" android:strokeColor="#4a2907" android:strokeWidth="6" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+</vector>

@@ -3,18 +3,25 @@ import type { EquipmentType, WorkoutType } from '@/types/database.types'
 import { todayStr } from '@/utils/date'
 
 /**
- * A single logged exercise entry in the manual gym-log flow. Supports both
- * strength-style logging (weight x sets x reps) and timed/cardio-style
- * logging (e.g. "30 secs x 3 sets") via the optional duration fields.
+ * A single logged exercise entry in the manual gym-log flow. Supports three
+ * styles depending on what's filled in:
+ *  - Strength: sets + reps + weight_kg
+ *  - Timed/cardio bodyweight sets: sets + duration_seconds (e.g. "30 sec x 3
+ *    sets" burpees), duration_unit 'sec'
+ *  - Machine cardio: no sets/reps at all — just distance_km and/or a total
+ *    duration entered in whichever unit the user prefers (duration_unit
+ *    'sec' or 'min'), e.g. "20 min on the recumbent bike, 5km".
  */
 export interface DraftExercise {
   tempId: string
   exercise_name: string
   equipment: EquipmentType
+  isMachineCardio: boolean
   weight_kg: number | null
-  sets: number
+  sets: number | null
   reps: number | null
   duration_seconds: number | null
+  duration_unit: 'sec' | 'min'
   distance_km: number | null
   rest_seconds: number | null
   rpe: number | null

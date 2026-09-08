@@ -1,13 +1,19 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote, CheckCircle2, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDayActivityLog } from '@/hooks/use-day-activity-log'
-import { formatDisplayDate, formatDurationHM } from '@/utils/date'
+import { useDeleteWaterLog, useSaveDailyNote } from '@/hooks/use-tracking'
+import { useDeleteMeal } from '@/hooks/use-nutrition'
+import { formatDisplayDate, formatDurationHM, isWithinEditWindow } from '@/utils/date'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 const MOOD_EMOJI: Record<string, string> = {
   excellent: '😀',
@@ -17,10 +23,46 @@ const MOOD_EMOJI: Record<string, string> = {
   very_bad: '😫',
 }
 
+function formatExerciseSummary(ex: {
+  distance_km: number | null
+  duration_seconds: number | null
+  duration_unit?: 'sec' | 'min' | null
+  sets: number
+  reps: number
+  weight_kg: number
+}): string {
+  const unit = ex.duration_unit ?? 'sec'
+  const durationLabel = ex.duration_seconds
+    ? unit === 'min'
+      ? `${ex.duration_seconds}min`
+      : `${ex.duration_seconds}s`
+    : null
+
+  if (ex.distance_km) {
+    return `${ex.distance_km}km${durationLabel ? ` · ${durationLabel}` : ''}`
+  }
+  if (durationLabel && !ex.sets) {
+    return durationLabel
+  }
+  if (ex.duration_seconds) {
+    return `${durationLabel} × ${ex.sets} sets`
+  }
+  return `${ex.weight_kg ? `${ex.weight_kg}kg × ` : ''}${ex.sets}×${ex.reps}`
+}
+
 export default function DayDetailPage() {
   const { date } = useParams<{ date: string }>()
   const navigate = useNavigate()
   const { data, isLoading } = useDayActivityLog(date!)
+  const deleteWater = useDeleteWaterLog()
+  const deleteMeal = useDeleteMeal()
+  const saveNote = useSaveDailyNote()
+  const [noteDraft, setNoteDraft] = useState('')
+  const [editingNote, setEditingNote] = useState(false)
+
+  useEffect(() => {
+    if (data) setNoteDraft(data.notes ?? '')
+  }, [data])
 
   if (isLoading || !data) {
     return (
@@ -32,7 +74,15 @@ export default function DayDetailPage() {
     )
   }
 
+  const editable = isWithinEditWindow(date!)
   const totalWater = data.waterLogs.reduce((s, w) => s + w.amount_ml, 0)
+  const sectionsLogged = [
+    data.workoutSessions.length > 0,
+    data.meals.length > 0,
+    data.waterLogs.length > 0,
+    !!data.weightLog,
+    data.habitCheckins.length > 0,
+  ].filter(Boolean).length
 
   return (
     <div className="space-y-6">
@@ -40,11 +90,11 @@ export default function DayDetailPage() {
         <Button variant="outline" size="icon-sm" onClick={() => navigate('/calendar')}>
           <ArrowLeft className="size-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold">{formatDisplayDate(date!)}</h1>
-          {data.habitCheckins.length > 0 && (
-            <p className="text-sm text-muted-foreground">{data.habitCheckins.length} habit check-in{data.habitCheckins.length === 1 ? '' : 's'}</p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            {sectionsLogged > 0 ? `${sectionsLogged} area${sectionsLogged === 1 ? '' : 's'} logged` : 'Nothing logged this day'}
+          </p>
         </div>
       </div>
 
@@ -52,14 +102,38 @@ export default function DayDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="size-4" /> Daily Routine
+            <IconChip icon={Clock} gradient="from-indigo-400 to-indigo-700" size="sm" /> Daily Routine
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <InfoBlock label="Wake Up" value={data.wakeUpTime ? format(new Date(data.wakeUpTime), 'h:mm a') : '—'} />
-          <InfoBlock label="Sleep" value={data.sleepTime ? format(new Date(data.sleepTime), 'h:mm a') : '—'} />
-          <InfoBlock label="Steps" value={data.stepLog?.steps.toLocaleString() ?? '—'} icon={Footprints} />
-          <InfoBlock label="Mood" value={data.moodLog ? `${MOOD_EMOJI[data.moodLog.mood]} ${data.moodLog.mood}` : '—'} icon={Smile} />
+        <CardContent className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <InfoBlock
+            label="Slept At"
+            value={data.sleepLog?.sleep_time ? format(new Date(data.sleepLog.sleep_time), 'h:mm a') : data.sleepTime ? format(new Date(data.sleepTime), 'h:mm a') : '—'}
+            icon={Moon}
+            onClick={editable ? () => navigate(`/tracking/sleep?date=${date}`) : undefined}
+          />
+          <InfoBlock
+            label="Woke Up"
+            value={data.sleepLog?.wake_time ? format(new Date(data.sleepLog.wake_time), 'h:mm a') : data.wakeUpTime ? format(new Date(data.wakeUpTime), 'h:mm a') : '—'}
+            onClick={editable ? () => navigate(`/tracking/sleep?date=${date}`) : undefined}
+          />
+          <InfoBlock
+            label="Hours Slept"
+            value={data.sleepLog?.hours_slept ? `${data.sleepLog.hours_slept.toFixed(1)}h` : '—'}
+            onClick={editable ? () => navigate(`/tracking/sleep?date=${date}`) : undefined}
+          />
+          <InfoBlock
+            label="Steps"
+            value={data.stepLog?.steps.toLocaleString() ?? '—'}
+            icon={Footprints}
+            onClick={editable ? () => navigate(`/tracking/steps?date=${date}`) : undefined}
+          />
+          <InfoBlock
+            label="Mood"
+            value={data.moodLog ? `${MOOD_EMOJI[data.moodLog.mood]} ${data.moodLog.mood}` : '—'}
+            icon={Smile}
+            onClick={editable ? () => navigate(`/tracking/mood?date=${date}`) : undefined}
+          />
         </CardContent>
       </Card>
 
@@ -67,20 +141,29 @@ export default function DayDetailPage() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Dumbbell className="size-4" /> Workouts
+            <IconChip icon={Dumbbell} gradient="from-emerald-400 to-teal-600" size="sm" /> Workouts
           </CardTitle>
-          <Badge>{data.workoutSessions.length} sessions</Badge>
+          {data.workoutSessions.length > 0 && <Badge>{data.workoutSessions.length} sessions</Badge>}
         </CardHeader>
         <CardContent>
           {data.workoutSessions.length === 0 ? (
-            <EmptyState icon={Dumbbell} title="No workout logged" description="Nothing recorded for this day." />
+            editable ? (
+              <Button variant="outline" className="w-full" onClick={() => navigate(`/workout/log?date=${date}`)}>
+                <Dumbbell className="size-4" /> Log a workout for this day
+              </Button>
+            ) : (
+              <EmptyState icon={Dumbbell} title="No workout logged" description="Nothing recorded for this day." />
+            )
           ) : (
             <div className="space-y-4">
               {data.workoutSessions.map((session) => (
-                <button
+                <div
                   key={session.id}
-                  onClick={() => navigate(`/workout/log/${session.id}`)}
-                  className="w-full text-left rounded-xl border border-border p-4 hover:border-primary/30 transition-colors"
+                  onClick={editable ? () => navigate(`/workout/log/${session.id}`) : undefined}
+                  className={cn(
+                    'w-full text-left rounded-xl border border-border p-4 transition-colors',
+                    editable ? 'cursor-pointer hover:border-primary/30 hover:bg-muted/30' : 'opacity-90'
+                  )}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <p className="font-semibold">{session.title || session.workout_types.join(', ')}</p>
@@ -105,19 +188,18 @@ export default function DayDetailPage() {
                       {session.strengthExercises.map((ex) => (
                         <div key={ex.id} className="flex justify-between text-sm text-muted-foreground">
                           <span>{ex.exercise_name}</span>
-                          <span>
-                            {ex.distance_km
-                              ? `${ex.distance_km}km${ex.duration_seconds ? ` · ${Math.round(ex.duration_seconds / 60)}min` : ''}`
-                              : ex.duration_seconds
-                                ? `${ex.duration_seconds}s × ${ex.sets} sets`
-                                : `${ex.weight_kg ? `${ex.weight_kg}kg × ` : ''}${ex.sets}×${ex.reps}`}
-                          </span>
+                          <span>{formatExerciseSummary(ex)}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                </button>
+                </div>
               ))}
+              {editable && (
+                <Button variant="outline" className="w-full" onClick={() => navigate(`/workout/log?date=${date}`)}>
+                  <Dumbbell className="size-4" /> Log another workout for this day
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -128,7 +210,7 @@ export default function DayDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="size-4" /> Habits
+              <IconChip icon={CheckCircle2} gradient="from-fuchsia-400 to-purple-600" size="sm" /> Habits
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -153,10 +235,13 @@ export default function DayDetailPage() {
       )}
 
       {/* Nutrition */}
-      <Card>
+      <Card
+        className={cn(editable && 'cursor-pointer hover:border-primary/30 transition-colors')}
+        onClick={editable ? () => navigate(`/nutrition?date=${date}`) : undefined}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <UtensilsCrossed className="size-4" /> Nutrition
+            <IconChip icon={UtensilsCrossed} gradient="from-orange-400 to-red-500" size="sm" /> Nutrition
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -165,13 +250,31 @@ export default function DayDetailPage() {
           ) : (
             <div className="space-y-2">
               {data.meals.map((meal) => (
-                <div key={meal.id} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
+                <motion.div
+                  key={meal.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 group"
+                >
                   <div>
                     <span className="font-medium">{meal.food_name}</span>
                     <span className="text-muted-foreground ml-2 text-xs uppercase">{meal.meal_type.replace('_', ' ')}</span>
                   </div>
-                  {meal.quantity && <span className="text-muted-foreground text-xs">{meal.quantity}</span>}
-                </div>
+                  <div className="flex items-center gap-2">
+                    {meal.quantity && <span className="text-muted-foreground text-xs">{meal.quantity}</span>}
+                    {editable && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteMeal.mutate(meal.id)
+                        }}
+                        className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -180,21 +283,50 @@ export default function DayDetailPage() {
 
       {/* Water & Weight */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <Card>
+        <Card
+          className={cn(editable && 'cursor-pointer hover:border-primary/30 transition-colors')}
+          onClick={editable ? () => navigate(`/tracking/water?date=${date}`) : undefined}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Droplets className="size-4" /> Water Intake
+              <IconChip icon={Droplets} gradient="from-sky-400 to-blue-600" size="sm" /> Water Intake
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{(totalWater / 1000).toFixed(2)}L</p>
-            <p className="text-sm text-muted-foreground">{data.waterLogs.length} logs</p>
+            <p className="text-sm text-muted-foreground mb-2">{data.waterLogs.length} logs</p>
+            {data.waterLogs.length > 0 && (
+              <div className="space-y-1">
+                {data.waterLogs.map((w) => (
+                  <div key={w.id} className="flex justify-between items-center text-xs text-muted-foreground group">
+                    <span>{format(new Date(w.logged_at), 'h:mm a')}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{w.amount_ml}ml</span>
+                      {editable && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteWater.mutate(w.id)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={cn(editable && 'cursor-pointer hover:border-primary/30 transition-colors')}
+          onClick={editable ? () => navigate(`/tracking/weight?date=${date}`) : undefined}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Scale className="size-4" /> Weight
+              <IconChip icon={Scale} gradient="from-violet-400 to-purple-600" size="sm" /> Weight
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -204,30 +336,77 @@ export default function DayDetailPage() {
         </Card>
       </div>
 
-      {data.notes && (
+      {(data.notes || editingNote) ? (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <StickyNote className="size-4" /> Notes
+              <StickyNote className="size-4" /> Reflection
             </CardTitle>
+            {!editingNote && editable && (
+              <Button variant="ghost" size="sm" onClick={() => setEditingNote(true)}>
+                Edit
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">{data.notes}</p>
+            {editingNote ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder="How did today go? Any wins, challenges, or thoughts..."
+                  rows={4}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setEditingNote(false); setNoteDraft(data.notes ?? '') }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    size="sm"
+                    onClick={async () => {
+                      await saveNote.mutateAsync({ date: date!, notes: noteDraft })
+                      setEditingNote(false)
+                    }}
+                    disabled={saveNote.isPending}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{data.notes}</p>
+            )}
           </CardContent>
         </Card>
-      )}
+      ) : editable ? (
+        <Button variant="outline" className="w-full" onClick={() => setEditingNote(true)}>
+          <StickyNote className="size-4" /> Add a reflection for this day
+        </Button>
+      ) : null}
     </div>
   )
 }
 
-function InfoBlock({ label, value, icon: Icon }: { label: string; value: string; icon?: typeof Moon }) {
+function InfoBlock({ label, value, icon: Icon, onClick }: { label: string; value: string; icon?: typeof Moon; onClick?: () => void }) {
   return (
-    <div>
+    <div
+      onClick={onClick}
+      className={cn(onClick && 'cursor-pointer rounded-lg -m-1 p-1 hover:bg-muted/60 transition-colors')}
+    >
       <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
         {Icon && <Icon className="size-3.5" />}
         <span className="text-xs">{label}</span>
       </div>
       <p className="font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function IconChip({ icon: Icon, gradient, size = 'md' }: { icon: typeof Moon; gradient: string; size?: 'sm' | 'md' }) {
+  return (
+    <div className={cn('flex items-center justify-center rounded-lg bg-gradient-to-br shadow-sm shrink-0', gradient, size === 'sm' ? 'h-6 w-6' : 'h-8 w-8')}>
+      <Icon className={cn('text-white', size === 'sm' ? 'size-3.5' : 'size-4')} />
     </div>
   )
 }

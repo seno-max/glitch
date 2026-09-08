@@ -1,7 +1,11 @@
+import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Smile } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useMoodHistory, useLogMood } from '@/hooks/use-tracking'
-import { todayStr } from '@/utils/date'
+import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO } from 'date-fns'
 import type { MoodType } from '@/types/database.types'
 import { motion } from 'framer-motion'
@@ -15,10 +19,13 @@ const MOODS: { type: MoodType; emoji: string; label: string; color: string }[] =
 ]
 
 export default function MoodPage() {
+  const [searchParams] = useSearchParams()
+  const [date, setDate] = useState(searchParams.get('date') ?? todayStr())
   const { data: history } = useMoodHistory(30)
   const logMood = useLogMood()
 
-  const todayMood = history?.find((h) => h.date === todayStr())
+  const editable = isWithinEditWindow(date)
+  const dayMood = history?.find((h) => h.date === date)
 
   return (
     <div className="space-y-6">
@@ -28,19 +35,22 @@ export default function MoodPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>How are you feeling today?</CardTitle>
+          <CardTitle>{date === todayStr() ? 'How are you feeling today?' : 'How were you feeling that day?'}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="max-w-xs">
+            <Label className="text-xs">Date</Label>
+            <Input type="date" min={earliestEditableDate()} max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
           <div className="grid grid-cols-5 gap-2">
             {MOODS.map((mood) => (
               <motion.button
                 key={mood.type}
                 whileTap={{ scale: 0.92 }}
-                onClick={() =>
-                  logMood.mutate({ date: todayStr(), mood: mood.type, energy_level: null, notes: null })
-                }
-                className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 transition-all ${
-                  todayMood?.mood === mood.type ? `${mood.color} border-current` : 'border-border hover:border-primary/30'
+                disabled={!editable}
+                onClick={() => logMood.mutate({ date, mood: mood.type, energy_level: null, notes: null })}
+                className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 transition-all disabled:opacity-50 disabled:pointer-events-none ${
+                  dayMood?.mood === mood.type ? `${mood.color} border-current` : 'border-border hover:border-primary/30'
                 }`}
               >
                 <span className="text-3xl">{mood.emoji}</span>

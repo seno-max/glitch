@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Scale, TrendingDown, TrendingUp, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,19 +9,32 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWeightHistory, useLogWeight, useDeleteWeightLog } from '@/hooks/use-tracking'
 import { useAuthStore } from '@/stores/auth.store'
-import { todayStr } from '@/utils/date'
+import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO, subDays } from 'date-fns'
 import { EmptyState } from '@/components/shared/empty-state'
 
 export default function WeightPage() {
+  const [searchParams] = useSearchParams()
   const { profile } = useAuthStore()
   const { data: history, isLoading } = useWeightHistory(3650)
   const logWeight = useLogWeight()
   const deleteWeight = useDeleteWeightLog()
   const [range, setRange] = useState<'week' | 'month' | 'year' | 'all'>('month')
 
-  const [date, setDate] = useState(todayStr())
+  const [date, setDate] = useState(searchParams.get('date') ?? todayStr())
   const [weight, setWeight] = useState('')
+
+  // If opened for a specific past day, prefill with whatever's already
+  // logged for that date so it feels like editing, not re-entering.
+  useEffect(() => {
+    const paramDate = searchParams.get('date')
+    if (!paramDate || !history) return
+    const existing = history.find((h) => h.date === paramDate)
+    if (existing) setWeight(String(existing.weight_kg))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history])
+
+  const editable = isWithinEditWindow(date)
 
   const days = range === 'week' ? 7 : range === 'month' ? 30 : range === 'year' ? 365 : 3650
   const filtered = (history ?? []).filter((h) => parseISO(h.date) >= subDays(new Date(), days))
@@ -93,14 +107,14 @@ export default function WeightPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Date</Label>
-              <Input type="date" max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input type="date" min={earliestEditableDate()} max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs">Weight (kg)</Label>
               <Input type="number" step="0.1" placeholder="e.g. 72.5" value={weight} onChange={(e) => setWeight(e.target.value)} />
             </div>
           </div>
-          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!weight || !date || logWeight.isPending}>
+          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!weight || !date || !editable || logWeight.isPending}>
             Save Entry
           </Button>
         </CardContent>
@@ -146,23 +160,28 @@ export default function WeightPage() {
             <EmptyState icon={Scale} title="No entries yet" />
           ) : (
             <div className="space-y-1">
-              {recentEntries.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <p className="text-sm font-medium">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold">{entry.weight_kg} kg</p>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteWeight.mutate(entry.id)}
-                      disabled={deleteWeight.isPending}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
+              {recentEntries.map((entry) => {
+                const rowEditable = isWithinEditWindow(entry.date)
+                return (
+                  <div key={entry.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <p className="text-sm font-medium">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold">{entry.weight_kg} kg</p>
+                      {rowEditable && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteWeight.mutate(entry.id)}
+                          disabled={deleteWeight.isPending}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

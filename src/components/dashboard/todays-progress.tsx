@@ -1,70 +1,96 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Footprints, Droplets } from 'lucide-react'
+import { Footprints, Droplets, Dumbbell, Check } from 'lucide-react'
+import { Ring } from '@/components/ui/ring'
 import type { DailyProgress } from '@/types/models'
-import { cn } from '@/lib/utils'
 
+/**
+ * "Today" summary rendered as three activity rings (Apple Fitness / Google
+ * Fit style) instead of flat progress bars — a single glance tells you
+ * exactly how the day is going, and each ring fills with a satisfying
+ * animation the moment you log something.
+ */
 export function TodaysProgress({ progress }: { progress: DailyProgress }) {
+  const stepsPct = progress.stepsGoal > 0 ? Math.min(100, (progress.stepsCurrent / progress.stepsGoal) * 100) : 0
+  const waterPct = progress.waterGoalMl > 0 ? Math.min(100, (progress.waterCurrentMl / progress.waterGoalMl) * 100) : 0
+  const workoutPct = progress.workoutDone ? 100 : 0
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Today's Progress</CardTitle>
+        <CardTitle>Today</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <ProgressRow
-          icon={Footprints}
-          label="Steps"
-          current={progress.stepsCurrent}
-          goal={progress.stepsGoal}
-          formatValue={(v) => v.toLocaleString()}
-          iconGradient="from-orange-400 to-pink-500"
-          barColorClass="bg-gradient-to-r from-orange-400 to-pink-500"
-        />
-        <ProgressRow
-          icon={Droplets}
-          label="Water"
-          current={progress.waterCurrentMl}
-          goal={progress.waterGoalMl}
-          formatValue={(v) => `${(v / 1000).toFixed(1)}L`}
-          iconGradient="from-sky-400 to-blue-600"
-          barColorClass="gradient-accent"
-        />
+      <CardContent>
+        <div className="grid grid-cols-3 gap-3">
+          <RingStat
+            icon={Footprints}
+            label="Steps"
+            pct={stepsPct}
+            valueLabel={progress.stepsCurrent.toLocaleString()}
+            goalLabel={`/ ${progress.stepsGoal.toLocaleString()}`}
+            colorFrom="#fb923c"
+            colorTo="#ec4899"
+          />
+          <RingStat
+            icon={Droplets}
+            label="Water"
+            pct={waterPct}
+            valueLabel={`${(progress.waterCurrentMl / 1000).toFixed(1)}L`}
+            goalLabel={`/ ${(progress.waterGoalMl / 1000).toFixed(1)}L`}
+            colorFrom="#38bdf8"
+            colorTo="#0ea5e9"
+          />
+          <RingStat
+            icon={Dumbbell}
+            label="Workout"
+            pct={workoutPct}
+            valueLabel={progress.workoutDone ? 'Done' : 'Not yet'}
+            goalLabel=""
+            colorFrom="#34d399"
+            colorTo="#059669"
+            showCheck={progress.workoutDone}
+          />
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-function ProgressRow({
+function RingStat({
   icon: Icon,
   label,
-  current,
-  goal,
-  formatValue,
-  iconGradient,
-  barColorClass,
+  pct,
+  valueLabel,
+  goalLabel,
+  colorFrom,
+  colorTo,
+  showCheck,
 }: {
   icon: typeof Footprints
   label: string
-  current: number
-  goal: number
-  formatValue: (v: number) => string
-  iconGradient: string
-  barColorClass: string
+  pct: number
+  valueLabel: string
+  goalLabel: string
+  colorFrom: string
+  colorTo: string
+  showCheck?: boolean
 }) {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          <div className={cn('flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br', iconGradient)}>
-            <Icon className="size-3.5 text-white" strokeWidth={2.25} />
+    <div className="flex flex-col items-center gap-2">
+      <Ring pct={pct} colorFrom={colorFrom} colorTo={colorTo}>
+        {showCheck ? (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: `linear-gradient(135deg, ${colorFrom}, ${colorTo})` }}>
+            <Check className="size-4 text-white" strokeWidth={3} />
           </div>
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {formatValue(current)} / {formatValue(goal)}
-        </span>
+        ) : (
+          <Icon className="size-5" style={{ color: colorTo }} strokeWidth={2.25} />
+        )}
+      </Ring>
+      <div className="text-center">
+        <p className="text-sm font-bold leading-tight">
+          {valueLabel} <span className="text-muted-foreground font-normal text-xs">{goalLabel}</span>
+        </p>
+        <p className="text-xs text-muted-foreground">{label}</p>
       </div>
-      <Progress value={current} max={goal} colorClass={barColorClass} />
     </div>
   )
 }

@@ -79,7 +79,6 @@ export const gamificationService = {
     if (error) throw error
     return (data ?? []) as unknown as Streak[]
   },
-
   async getStreak(userId: string, category: StreakCategory): Promise<Streak | null> {
     const { data, error } = await supabase
       .from('streaks')

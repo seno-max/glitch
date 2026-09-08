@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2x1 home-screen widget: minResizeWidth/Height locked to the 2x1 cell size
+  (roughly 110dp x 40dp on a standard 4-column launcher grid, with a little
+  headroom) so it can't be shrunk below a usable size, but can be widened.
+  updatePeriodMillis is left at a conservative 30 minute floor (Android
+  ignores anything under about 30 minutes) as a background-refresh safety
+  net; the widget is primarily push-updated in real time whenever the app
+  logs a workout or loads the dashboard, via GymStreakWidgetProvider.pushUpdate().
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_gym_streak"
+    android:previewImage="@drawable/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_gym_streak_description" />

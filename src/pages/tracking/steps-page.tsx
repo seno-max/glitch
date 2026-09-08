@@ -1,22 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Footprints } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useStepsToday, useStepsHistory, useLogSteps, useSettings } from '@/hooks/use-tracking'
+import { useStepsForDate, useStepsHistory, useLogSteps, useSettings } from '@/hooks/use-tracking'
+import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO } from 'date-fns'
 
 export default function StepsPage() {
-  const { data: today } = useStepsToday()
+  const [searchParams] = useSearchParams()
+  const [date, setDate] = useState(searchParams.get('date') ?? todayStr())
+  const { data: dayLog } = useStepsForDate(date)
   const { data: settings } = useSettings()
   const { data: history } = useStepsHistory(30)
   const logSteps = useLogSteps()
   const [input, setInput] = useState('')
 
+  const editable = isWithinEditWindow(date)
+
+  // Prefill the input with whatever's already logged for the selected date.
+  useEffect(() => {
+    setInput(dayLog ? String(dayLog.steps) : '')
+  }, [dayLog])
+
   const goal = settings?.step_goal ?? 10000
-  const current = today?.steps ?? 0
+  const current = dayLog?.steps ?? 0
 
   const weekData = (history ?? []).slice(-7)
   const avgWeek = weekData.length ? Math.round(weekData.reduce((s, d) => s + d.steps, 0) / weekData.length) : 0
@@ -32,15 +44,23 @@ export default function StepsPage() {
       </h1>
 
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-6 space-y-4">
+          <div>
+            <Label className="text-xs">Date</Label>
+            <Input type="date" min={earliestEditableDate()} max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-3xl font-bold">{current.toLocaleString()}</p>
             <p className="text-sm text-muted-foreground">/ {goal.toLocaleString()} steps</p>
           </div>
           <Progress value={current} max={goal} colorClass="bg-gradient-to-r from-orange-400 to-pink-500" />
           <div className="flex gap-2 mt-4">
-            <Input type="number" placeholder="Enter today's steps" value={input} onChange={(e) => setInput(e.target.value)} />
-            <Button variant="gradient" onClick={() => input && logSteps.mutate(Number(input))} disabled={!input || logSteps.isPending}>
+            <Input type="number" placeholder="Enter steps" value={input} onChange={(e) => setInput(e.target.value)} disabled={!editable} />
+            <Button
+              variant="gradient"
+              onClick={() => input && logSteps.mutate({ date, steps: Number(input) })}
+              disabled={!input || !editable || logSteps.isPending}
+            >
               Log
             </Button>
           </div>

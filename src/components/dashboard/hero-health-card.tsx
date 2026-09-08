@@ -1,12 +1,36 @@
 import { motion } from 'framer-motion'
-import { Flame, Trophy, Star } from 'lucide-react'
+import { Flame, Trophy, Star, Check } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import type { DashboardSummary } from '@/types/models'
-import { formatDisplayDate } from '@/utils/date'
+import { todayStr } from '@/utils/date'
+import { dailyQuote } from '@/utils/quotes'
+import { AnimatedCounter } from '@/components/ui/animated-counter'
+import { cn } from '@/lib/utils'
+
+/**
+ * Picks a warm, human headline based on what's actually happening today —
+ * no arbitrary "level up" framing, just genuine encouragement tied to real
+ * signals (streaks, today's activity, points earned).
+ */
+function pickHeadline(summary: DashboardSummary): string {
+  const gymStreak = summary.currentStreaks.find((s) => s.category === 'gym')?.current_streak ?? 0
+  const stepsStreak = summary.currentStreaks.find((s) => s.category === 'steps')?.current_streak ?? 0
+  const activeToday = summary.weekActivity.find((d) => d.date === todayStr())?.active ?? false
+
+  if (gymStreak >= 5) return `${gymStreak} days strong — you're on fire! 🔥`
+  if (gymStreak >= 2) return `${gymStreak} days in a row — keep it going!`
+  if (stepsStreak >= 3) return `${stepsStreak} day step streak — nice pace!`
+  if (activeToday && summary.pointsToday > 0) return "You've already shown up today 🎉"
+  if (activeToday) return 'Great start today — keep the momentum!'
+  return "Let's make today count 💪"
+}
 
 export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
   const weightDiff = summary.weightDifferenceKg
   const gymStreak = summary.currentStreaks.find((s) => s.category === 'gym')
   const stepsStreak = summary.currentStreaks.find((s) => s.category === 'steps')
+  const today = todayStr()
+  const activeDaysThisWeek = summary.weekActivity.filter((d) => d.active).length
 
   return (
     <motion.div
@@ -19,36 +43,37 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
 
       <div className="relative z-10">
         <p className="text-white/60 text-sm font-medium">{summary.greeting} 👋</p>
-        <h1 className="text-2xl sm:text-3xl font-bold mt-1">Let's crush today's goals</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mt-1">{pickHeadline(summary)}</h1>
+        <p className="text-white/40 text-xs mt-2 italic">“{dailyQuote()}”</p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-          <div>
-            <p className="text-white/50 text-xs mb-1">Current Weight</p>
-            <p className="text-xl font-bold">{summary.currentWeightKg?.toFixed(1) ?? '—'} kg</p>
-            {summary.lastWeightLogDate && (
-              <p className="text-white/40 text-[11px] mt-0.5">Logged {formatDisplayDate(summary.lastWeightLogDate, 'MMM d')}</p>
+        {(summary.currentWeightKg !== null || summary.goalWeightKg !== null) && (
+          <div className="flex items-center gap-4 mt-5 text-white/70 text-xs">
+            <span>
+              Weight <span className="text-white font-semibold">{summary.currentWeightKg?.toFixed(1) ?? '—'} kg</span>
+            </span>
+            {summary.goalWeightKg !== null && (
+              <span>
+                Goal <span className="text-white font-semibold">{summary.goalWeightKg.toFixed(1)} kg</span>
+              </span>
+            )}
+            {weightDiff !== null && (
+              <span className="text-emerald-300 font-semibold">{Math.abs(weightDiff).toFixed(1)} kg to go</span>
             )}
           </div>
-          <div>
-            <p className="text-white/50 text-xs mb-1">Goal Weight</p>
-            <p className="text-xl font-bold">{summary.goalWeightKg?.toFixed(1) ?? '—'} kg</p>
-          </div>
-          <div>
-            <p className="text-white/50 text-xs mb-1">To Go</p>
-            <p className="text-xl font-bold text-gradient-primary">
-              {weightDiff !== null ? `${Math.abs(weightDiff).toFixed(1)} kg` : '—'}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="mt-6 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-400/20 px-3 py-1.5">
             <Trophy className="size-4 text-amber-400" />
-            <span className="text-sm font-semibold">{summary.pointsToday} pts today</span>
+            <span className="text-sm font-semibold">
+              <AnimatedCounter value={summary.pointsToday} /> pts today
+            </span>
           </div>
           <div className="flex items-center gap-1.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/20 px-3 py-1.5">
             <Star className="size-4 text-fuchsia-300" />
-            <span className="text-sm font-semibold">{summary.totalPoints} total pts</span>
+            <span className="text-sm font-semibold">
+              <AnimatedCounter value={summary.totalPoints} /> total pts
+            </span>
           </div>
           {gymStreak && gymStreak.current_streak > 0 && (
             <div className="flex items-center gap-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 px-3 py-1.5">
@@ -62,6 +87,46 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
               <span className="text-sm font-semibold">{stepsStreak.current_streak} day step streak</span>
             </div>
           )}
+        </div>
+
+        {/* Weekly consistency strip — "did I show up" visual, Mon-Sun */}
+        <div className="mt-6 pt-5 border-t border-white/10">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-white/60 text-xs font-medium">This week</p>
+            <p className="text-white/60 text-xs font-medium">{activeDaysThisWeek}/7 active days</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {summary.weekActivity.map((d, i) => {
+              const isToday = d.date === today
+              const isFuture = d.date > today
+              return (
+                <motion.div
+                  key={d.date}
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex-1 flex flex-col items-center gap-1"
+                >
+                  <div
+                    className={cn(
+                      'flex h-9 w-full items-center justify-center rounded-xl border transition-all',
+                      d.active
+                        ? 'bg-gradient-to-br from-emerald-400 to-teal-500 border-emerald-300/40 shadow-md'
+                        : isFuture
+                          ? 'border-white/10 bg-white/5'
+                          : 'border-white/15 bg-white/10',
+                      isToday && !d.active && 'ring-2 ring-white/50'
+                    )}
+                  >
+                    {d.active && <Check className="size-4 text-white" strokeWidth={3} />}
+                  </div>
+                  <span className={cn('text-[10px]', isToday ? 'text-white font-semibold' : 'text-white/40')}>
+                    {format(parseISO(d.date), 'EEEEE')}
+                  </span>
+                </motion.div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </motion.div>

@@ -7,10 +7,11 @@ import { useUIStore, applyTheme } from '@/stores/ui.store'
 import { useAndroidBackButton } from '@/hooks/use-android-back-button'
 import { useNativeStatusBar } from '@/hooks/use-native-status-bar'
 
-import { AppShell } from '@/components/layout/app-shell'
 import { AuthGuard } from '@/components/layout/auth-guard'
 import { GuestGuard } from '@/components/layout/guest-guard'
 import { SplashScreen } from '@/components/layout/splash-screen'
+
+const AppShell = lazy(() => import('@/components/layout/app-shell').then((m) => ({ default: m.AppShell })))
 
 const LoginPage = lazy(() => import('@/pages/auth/login'))
 const RegisterPage = lazy(() => import('@/pages/auth/register'))

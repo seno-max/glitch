@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Gym-cat mascot, pose: DUMBBELL CURL (early streak, 1-2 days).
+  Both arms holding a dumbbell across the chest, mid-curl.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Tail -->
+    <path android:pathData="M140,160 C160,156 168,138 158,122 C152,113 142,113 138,120"
+        android:strokeColor="#1e40af" android:strokeWidth="14" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M140,160 C160,156 168,138 158,122 C152,113 142,113 138,120"
+        android:strokeColor="#3b82f6" android:strokeWidth="9" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Legs, wide braced stance -->
+    <path android:pathData="M72,182 L68,156" android:strokeColor="#1e3a8a" android:strokeWidth="20" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M72,182 L68,156" android:strokeColor="#3b82f6" android:strokeWidth="14" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M124,182 L128,156" android:strokeColor="#1e3a8a" android:strokeWidth="20" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M124,182 L128,156" android:strokeColor="#3b82f6" android:strokeWidth="14" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M62,188 A10,7 0 1 1 82,188 A10,7 0 1 1 62,188 Z" android:fillColor="#1e3a8a" />
+    <path android:pathData="M114,188 A10,7 0 1 1 134,188 A10,7 0 1 1 114,188 Z" android:fillColor="#1e3a8a" />
+
+    <!-- Both upper arms bent, curling in front of chest -->
+    <path android:pathData="M66,132 C58,118 62,102 76,96" android:strokeColor="#1e3a8a" android:strokeWidth="18" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M66,132 C58,118 62,102 76,96" android:strokeColor="#3b82f6" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M134,132 C142,118 138,102 124,96" android:strokeColor="#1e3a8a" android:strokeWidth="18" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M134,132 C142,118 138,102 124,96" android:strokeColor="#3b82f6" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Dumbbell bar across the chest -->
+    <path android:pathData="M74,92 L126,92" android:strokeColor="#111827" android:strokeWidth="10" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <!-- Dumbbell weight plates -->
+    <path android:pathData="M62,80 L62,104" android:strokeColor="#111827" android:strokeWidth="18" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M62,80 L62,104" android:strokeColor="#374151" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M138,80 L138,104" android:strokeColor="#111827" android:strokeWidth="18" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M138,80 L138,104" android:strokeColor="#374151" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Torso, leaning in with effort -->
+    <path android:pathData="M64,150 C60,112 70,88 100,88 C130,88 140,112 136,150 C134,168 118,180 100,180 C82,180 66,168 64,150 Z"
+        android:fillColor="#3b82f6" android:strokeColor="#1e3a8a" android:strokeWidth="7" />
+
+    <!-- Belly patch -->
+    <path android:pathData="M83,122 C81,142 85,163 100,165 C115,163 119,142 117,122 C115,111 108,105 100,105 C92,105 85,111 83,122 Z"
+        android:fillColor="#dbeafe" />
+
+    <!-- Head, tilted with a determined grin -->
+    <path android:pathData="M57,64 A43,39 0 1 1 143,64 A43,39 0 1 1 57,64 Z"
+        android:fillColor="#3b82f6" android:strokeColor="#1e3a8a" android:strokeWidth="7" />
+
+    <!-- Ears -->
+    <path android:pathData="M63,38 L73,10 L89,40 Z" android:fillColor="#3b82f6" android:strokeColor="#1e3a8a" android:strokeWidth="7" />
+    <path android:pathData="M137,38 L127,10 L111,40 Z" android:fillColor="#3b82f6" android:strokeColor="#1e3a8a" android:strokeWidth="7" />
+    <path android:pathData="M69,34 L74,18 L83,36 Z" android:fillColor="#bfdbfe" />
+    <path android:pathData="M131,34 L126,18 L117,36 Z" android:fillColor="#bfdbfe" />
+
+    <!-- Muzzle -->
+    <path android:pathData="M75,74 A25,18 0 1 1 125,74 A25,18 0 1 1 75,74 Z" android:fillColor="#dbeafe" />
+
+    <!-- Focused squint eyes (effort) -->
+    <path android:pathData="M72,56 C78,50 88,50 94,56" android:strokeColor="#0b2b5c" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:pathData="M106,56 C112,50 122,50 128,56" android:strokeColor="#0b2b5c" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000" />
+
+    <!-- Nose + gritted-teeth grin -->
+    <path android:pathData="M92,74 L108,74 L100,84 Z" android:fillColor="#f59e0b" />
+    <path android:pathData="M86,88 L114,88 L110,96 L90,96 Z" android:fillColor="#ffffff" android:strokeColor="#0b2b5c" android:strokeWidth="3" />
+
+</vector>

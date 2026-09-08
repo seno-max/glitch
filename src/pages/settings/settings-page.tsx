@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Sun, MoonStar, Monitor, Download, Trash2, LogOut, ShieldOff, Loader2, Zap } from 'lucide-react'
+import { Settings as SettingsIcon, Sun, MoonStar, Monitor, Download, Trash2, LogOut, ShieldOff, Loader2, Zap, CalendarOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { HabitManager } from '@/components/settings/habit-manager'
+import { StreakRewardManager } from '@/components/settings/streak-reward-manager'
 import { useSettings } from '@/hooks/use-tracking'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -17,6 +18,16 @@ import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { Theme, UnitSystem } from '@/types/database.types'
 
+const WEEKDAYS = [
+  { value: 0, label: 'Sun' },
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+]
+
 export default function SettingsPage() {
   const { user, signOut } = useAuthStore()
   const { data: settings } = useSettings()
@@ -26,14 +37,15 @@ export default function SettingsPage() {
   const [waterGoal, setWaterGoal] = useState(settings?.water_goal_ml ?? 3000)
   const [stepGoal, setStepGoal] = useState(settings?.step_goal ?? 10000)
   const [unit, setUnit] = useState<UnitSystem>(settings?.unit_system ?? 'metric')
+  const [restDays, setRestDays] = useState<number[]>(settings?.rest_days ?? [])
 
   // Configurable rewards — points are entirely opt-in per activity.
-  // Setting any of these to 0 disables points for that activity while
-  // keeping the activity itself fully trackable.
+  // Setting either of these to 0 disables points for that activity while
+  // keeping the activity itself fully trackable. Streak-length milestones
+  // and their bonus points are now fully user-defined (see Streak Rewards
+  // below) instead of a single fixed "gym streak" template.
   const [gymPoints, setGymPoints] = useState(settings?.gym_points ?? 100)
   const [stepsPoints, setStepsPoints] = useState(settings?.steps_points ?? 50)
-  const [gymStreakDays, setGymStreakDays] = useState(settings?.gym_streak_days ?? 5)
-  const [gymStreakPoints, setGymStreakPoints] = useState(settings?.gym_streak_points ?? 150)
 
   const handleSaveGoals = async () => {
     if (!user) return
@@ -41,9 +53,14 @@ export default function SettingsPage() {
       water_goal_ml: waterGoal,
       step_goal: stepGoal,
       unit_system: unit,
+      rest_days: restDays,
     })
     queryClient.invalidateQueries({ queryKey: ['settings'] })
     toast.success('Settings saved!')
+  }
+
+  const toggleRestDay = (day: number) => {
+    setRestDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
   }
 
   const handleSaveRewards = async () => {
@@ -51,8 +68,6 @@ export default function SettingsPage() {
     await profileService.updateSettings(user.id, {
       gym_points: Math.max(0, gymPoints),
       steps_points: Math.max(0, stepsPoints),
-      gym_streak_days: Math.max(1, gymStreakDays),
-      gym_streak_points: Math.max(0, gymStreakPoints),
     })
     queryClient.invalidateQueries({ queryKey: ['settings'] })
     toast.success('Reward settings saved!')
@@ -119,6 +134,8 @@ export default function SettingsPage() {
 
       <HabitManager />
 
+      <StreakRewardManager />
+
       <Card>
         <CardHeader>
           <CardTitle>Goals & Units</CardTitle>
@@ -140,6 +157,29 @@ export default function SettingsPage() {
               <label className="text-xs text-muted-foreground">Step Goal</label>
               <Input type="number" value={stepGoal} onChange={(e) => setStepGoal(Number(e.target.value))} />
             </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2">
+              <CalendarOff className="size-3.5" /> Rest Days
+            </label>
+            <div className="grid grid-cols-7 gap-1.5">
+              {WEEKDAYS.map((day) => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => toggleRestDay(day.value)}
+                  className={cn(
+                    'flex flex-col items-center justify-center rounded-xl border-2 py-2.5 text-xs font-semibold transition-all',
+                    restDays.includes(day.value) ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                  )}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Skipping the gym on a rest day won't break your streak — it just gets bridged over, as long as you're back at it the day after.
+            </p>
           </div>
           <Button variant="gradient" onClick={handleSaveGoals}>
             Save Changes
@@ -163,15 +203,10 @@ export default function SettingsPage() {
               <Label className="text-xs">Points for Step Goal</Label>
               <Input type="number" min={0} value={stepsPoints} onChange={(e) => setStepsPoints(Number(e.target.value))} />
             </div>
-            <div>
-              <Label className="text-xs">Gym Streak Length (days)</Label>
-              <Input type="number" min={1} value={gymStreakDays} onChange={(e) => setGymStreakDays(Number(e.target.value))} />
-            </div>
-            <div>
-              <Label className="text-xs">Gym Streak Bonus Points</Label>
-              <Input type="number" min={0} value={gymStreakPoints} onChange={(e) => setGymStreakPoints(Number(e.target.value))} />
-            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Want bonus points for hitting a streak? Add a Streak Reward above — you pick the name, day count, and points.
+          </p>
           <Button variant="gradient" onClick={handleSaveRewards}>
             Save Rewards
           </Button>

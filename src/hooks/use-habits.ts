@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { habitsService } from '@/services/habits.service'
 import { checkInHabit } from '@/services/scoring.engine'
 import { todayStr } from '@/utils/date'
+import { celebrate } from '@/utils/confetti'
 import type { Habit } from '@/types/database.types'
 import toast from 'react-hot-toast'
 
@@ -87,8 +88,11 @@ export function useCheckInHabit() {
       queryClient.invalidateQueries({ queryKey: ['habit-checkins'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      celebrate()
       if (result.pointsAwarded > 0) {
         toast.success(`+${result.pointsAwarded} points! 🎉`)
+      } else {
+        toast.success('Nice one! ✅')
       }
     },
   })

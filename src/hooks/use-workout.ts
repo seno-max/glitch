@@ -4,7 +4,9 @@ import { workoutService } from '@/services/workout.service'
 import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
 import { gamificationService } from '@/services/gamification.service'
 import { profileService } from '@/services/profile.service'
+import { checkAndUnlockAchievements } from '@/services/achievements.engine'
 import { todayStr } from '@/utils/date'
+import { celebrateBig } from '@/utils/confetti'
 import type { WorkoutType, StrengthExercise } from '@/types/database.types'
 import type { DraftExercise } from '@/stores/workout-log.store'
 import toast from 'react-hot-toast'
@@ -111,11 +113,12 @@ export function useSaveWorkoutLog() {
           exercise_name: ex.exercise_name,
           equipment: ex.equipment,
           weight_kg: ex.weight_kg ?? 0,
-          sets: ex.sets,
+          sets: ex.sets ?? 0,
           reps: ex.reps ?? 0,
           rest_seconds: ex.rest_seconds,
           rpe: ex.rpe,
           duration_seconds: ex.duration_seconds,
+          duration_unit: ex.duration_unit,
           distance_km: ex.distance_km,
           notes: ex.notes,
           order_index: i,
@@ -124,10 +127,16 @@ export function useSaveWorkoutLog() {
         savedExercises.push(saved)
       }
 
-      await updateStreak(user.id, 'gym', input.date, {
-        streakDays: settings?.gym_streak_days ?? 5,
-        streakPoints: settings?.gym_streak_points ?? 0,
-      })
+      await updateStreak(
+        user.id,
+        'gym',
+        (await workoutService.getSessionsInRange(user.id, '2000-01-01', todayStr())).filter((s) => s.is_completed).map((s) => s.date),
+        {
+          streakDays: settings?.gym_streak_days ?? 5,
+          streakPoints: settings?.gym_streak_points ?? 0,
+          restDays: settings?.rest_days ?? [],
+        }
+      )
       await awardDailyPoints(
         user.id,
         input.date,
@@ -139,29 +148,51 @@ export function useSaveWorkoutLog() {
         await checkStrengthPR(ex)
       }
 
-      return session
+      await checkAndUnlockAchievements(user.id)
+
+      return {
+        session,
+        summary: {
+          durationMinutes: session.duration_minutes ?? 0,
+          exerciseCount: savedExercises.length,
+          workoutTypes: input.workoutTypes,
+          date: input.date,
+        },
+      }
     },
     onSuccess: () => {
+      celebrateBig()
       toast.success('Workout saved! 💪')
       queryClient.invalidateQueries({ queryKey: ['workout-history'] })
       queryClient.invalidateQueries({ queryKey: ['workout-session-detail'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
     },
   })
 }
 
 export function useDeleteWorkoutSession() {
+  const { user } = useAuthStore()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (sessionId: string) => workoutService.deleteSession(sessionId),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Workout deleted')
+      if (user) {
+        // Recompute the gym streak from what's actually left after the
+        // deletion, in case the deleted session was part of the current
+        // or longest streak.
+        const settings = await profileService.getSettings(user.id)
+        const remaining = (await workoutService.getSessionsInRange(user.id, '2000-01-01', todayStr())).filter((s) => s.is_completed).map((s) => s.date)
+        await updateStreak(user.id, 'gym', remaining, { streakDays: settings?.gym_streak_days ?? 5, streakPoints: 0, restDays: settings?.rest_days ?? [] })
+      }
       queryClient.invalidateQueries({ queryKey: ['workout-history'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
     },
   })
 }
@@ -202,5 +233,13 @@ export function useWorkoutTemplates() {
     queryKey: ['workout-templates', user?.id],
     enabled: !!user,
     queryFn: () => workoutService.getTemplates(user!.id),
+  })
+}
+
+export function useTemplateExercises(templateId: string | null) {
+  return useQuery({
+    queryKey: ['template-exercises', templateId],
+    enabled: !!templateId,
+    queryFn: () => workoutService.getTemplateExercises(templateId!),
   })
 }

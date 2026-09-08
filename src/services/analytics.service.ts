@@ -28,11 +28,23 @@ export const analyticsService = {
     if (sessionIds.length) {
       const { data } = await supabase
         .from('strength_exercises')
-        .select('volume_kg, duration_seconds, distance_km, sets')
+        .select('volume_kg, duration_seconds, duration_unit, distance_km, sets')
         .in('session_id', sessionIds)
-      for (const r of (data ?? []) as { volume_kg: number | null; duration_seconds: number | null; distance_km: number | null; sets: number | null }[]) {
+      for (const r of (data ?? []) as {
+        volume_kg: number | null
+        duration_seconds: number | null
+        duration_unit: 'sec' | 'min' | null
+        distance_km: number | null
+        sets: number | null
+      }[]) {
         strengthVolumeKg += r.volume_kg ?? 0
-        if (r.duration_seconds) cardioMinutes += (r.duration_seconds * (r.sets || 1)) / 60
+        if (r.duration_seconds) {
+          // duration_seconds is stored in whatever unit the user picked at
+          // entry time (duration_unit). Machine cardio logged in minutes is
+          // a single total duration (no sets multiplier); timed bodyweight
+          // sets logged in seconds are "per set" and get multiplied by sets.
+          cardioMinutes += r.duration_unit === 'min' ? r.duration_seconds : (r.duration_seconds * (r.sets || 1)) / 60
+        }
         if (r.distance_km) cardioDistanceKm += r.distance_km
       }
     }
@@ -61,6 +73,18 @@ export const analyticsService = {
     const foodLoggingRatePct = Math.round((daysWithFood / daysInRange) * 100)
 
     const weightTrend = weightLogs.map((w) => ({ date: w.date, weight: w.weight_kg }))
+
+    // Steps & water trends for charting (one point per day that has data).
+    const stepsTrend = stepLogs
+      .slice()
+      .sort((a, b) => (a.date < b.date ? -1 : 1))
+      .map((s) => ({ date: s.date, steps: s.steps }))
+
+    const waterByDate: Record<string, number> = {}
+    for (const w of waterLogs) waterByDate[w.date] = (waterByDate[w.date] ?? 0) + w.amount_ml
+    const waterTrend = Object.entries(waterByDate)
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, ml]) => ({ date, ml }))
 
     // Points earned per day, from the points ledger (each row already has a date + points value).
     const pointsByDate: Record<string, number> = {}
@@ -106,6 +130,19 @@ export const analyticsService = {
       ? Object.entries(monthCounts).reduce((max, cur) => (cur[1] > max[1] ? cur : max))[0]
       : null
 
+    // Weekly comparison — workouts + total minutes per week across the
+    // range, for a simple "this week vs last week" style bar chart.
+    const weekBuckets: Record<string, { workouts: number; minutes: number }> = {}
+    for (const s of sessions) {
+      const wk = weekRange(new Date(s.date)).start
+      if (!weekBuckets[wk]) weekBuckets[wk] = { workouts: 0, minutes: 0 }
+      weekBuckets[wk].workouts += 1
+      weekBuckets[wk].minutes += s.duration_minutes ?? 0
+    }
+    const weeklyComparison = Object.entries(weekBuckets)
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([weekStart, v]) => ({ weekStart, workouts: v.workouts, minutes: Math.round(v.minutes) }))
+
     return {
       workoutHours: Math.round((workoutMinutes / 60) * 10) / 10,
       strengthVolumeKg: Math.round(strengthVolumeKg),
@@ -116,10 +153,13 @@ export const analyticsService = {
       avgWaterMl: Math.round(avgWaterMl),
       foodLoggingRatePct,
       weightTrend,
+      stepsTrend,
+      waterTrend,
       weeklyPoints,
       monthlyPoints,
       pointsTrend,
       workoutHeatmap,
+      weeklyComparison,
       mostActiveDay,
       bestWeek,
       bestMonth,

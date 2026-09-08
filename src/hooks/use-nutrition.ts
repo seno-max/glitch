@@ -37,6 +37,9 @@ export function useDeleteMeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['meals'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
     },
   })
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { syncGymStreakWidget } from '@/utils/gym-streak-widget'
 import type { Profile } from '@/types/database.types'
 
 interface AuthState {
@@ -61,5 +62,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // until that specific device explicitly signs out.
     await supabase.auth.signOut({ scope: 'local' })
     set({ user: null, session: null, profile: null })
+    // Clear the home-screen widget so it doesn't keep showing the signed-out
+    // user's streak until a new dashboard load overwrites it.
+    syncGymStreakWidget(0)
   },
 }))

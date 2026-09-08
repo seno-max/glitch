@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth.store'
 import { analyticsService } from '@/services/analytics.service'
 import { gamificationService } from '@/services/gamification.service'
+import { checkAndUnlockAchievements } from '@/services/achievements.engine'
 import { lastNDaysRange } from '@/utils/date'
 
 export function useAnalyticsSummary(days = 30) {
@@ -16,10 +17,20 @@ export function useAnalyticsSummary(days = 30) {
 
 export function useAchievements() {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   return useQuery({
     queryKey: ['achievements', user?.id],
     enabled: !!user,
     queryFn: async () => {
+      // Catch-up check: retroactively unlocks anything the user already
+      // qualifies for (e.g. a first workout logged before this engine
+      // existed) every time the achievements list is viewed, not just
+      // right after the triggering action.
+      const newlyUnlocked = await checkAndUnlockAchievements(user!.id)
+      if (newlyUnlocked.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      }
+
       const [catalog, unlocked] = await Promise.all([
         gamificationService.getAchievementCatalog(),
         gamificationService.getUserAchievements(user!.id),
