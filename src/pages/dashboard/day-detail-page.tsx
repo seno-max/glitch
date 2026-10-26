@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote, CheckCircle2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Dumbbell, UtensilsCrossed, Droplets, Scale, Moon, Smile, Footprints, Clock, StickyNote, CheckCircle2, Trash2, Snowflake } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDayActivityLog } from '@/hooks/use-day-activity-log'
-import { useDeleteWaterLog, useSaveDailyNote } from '@/hooks/use-tracking'
+import { useDeleteWaterLog, useSaveDailyNote, useRestDayLogs, useToggleRestDay } from '@/hooks/use-tracking'
 import { useDeleteMeal } from '@/hooks/use-nutrition'
-import { formatDisplayDate, formatDurationHM, isWithinEditWindow } from '@/utils/date'
+import { useSingleFlight, useKeyedSingleFlight } from '@/hooks/use-single-flight'
+import { formatDisplayDate, formatDurationHM, isWithinEditWindow, todayStr } from '@/utils/date'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -57,12 +58,30 @@ export default function DayDetailPage() {
   const deleteWater = useDeleteWaterLog()
   const deleteMeal = useDeleteMeal()
   const saveNote = useSaveDailyNote()
+  const { data: restDays } = useRestDayLogs()
+  const toggleRestDay = useToggleRestDay()
   const [noteDraft, setNoteDraft] = useState('')
   const [editingNote, setEditingNote] = useState(false)
 
   useEffect(() => {
     if (data) setNoteDraft(data.notes ?? '')
   }, [data])
+
+  const isFrozen = (restDays ?? []).some((r) => r.date === date)
+
+  const [handleToggleRestDay, togglingRestDay] = useSingleFlight(async () => {
+    await toggleRestDay.mutateAsync({ date: date!, freeze: !isFrozen })
+  })
+  const [handleDeleteMeal, isDeletingMeal] = useKeyedSingleFlight(async (id: string) => {
+    await deleteMeal.mutateAsync(id)
+  })
+  const [handleDeleteWater, isDeletingWater] = useKeyedSingleFlight(async (id: string) => {
+    await deleteWater.mutateAsync(id)
+  })
+  const [handleSaveNote, savingNote] = useSingleFlight(async () => {
+    await saveNote.mutateAsync({ date: date!, notes: noteDraft })
+    setEditingNote(false)
+  })
 
   if (isLoading || !data) {
     return (
@@ -97,6 +116,36 @@ export default function DayDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Rest day freeze — lets the user mark an unwell/skipped day so the
+          gym streak bridges over it instead of breaking. */}
+      {date! <= todayStr() && (
+        <Card className={cn(isFrozen && 'border-sky-400/40 bg-sky-500/5')}>
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg shrink-0', isFrozen ? 'bg-sky-500/15' : 'bg-muted')}>
+                <Snowflake className={cn('size-4', isFrozen ? 'text-sky-400' : 'text-muted-foreground')} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{isFrozen ? 'Frozen rest day' : 'Mark as rest day'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isFrozen
+                    ? 'Your streak bridges over this day — it won’t break while you recover.'
+                    : 'Unwell or taking a recovery day? Freeze the streak so it doesn’t break.'}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant={isFrozen ? 'outline' : 'gradient'}
+              size="sm"
+              onClick={handleToggleRestDay}
+              disabled={toggleRestDay.isPending || togglingRestDay}
+            >
+              {isFrozen ? 'Unfreeze' : 'Freeze Streak'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Routine summary */}
       <Card>
@@ -246,7 +295,7 @@ export default function DayDetailPage() {
         </CardHeader>
         <CardContent>
           {data.meals.length === 0 ? (
-            <EmptyState icon={UtensilsCrossed} title="No meals logged" />
+            <EmptyState icon={UtensilsCrossed} title="No meals logged" description="Nothing recorded for this day." />
           ) : (
             <div className="space-y-2">
               {data.meals.map((meal) => (
@@ -266,9 +315,10 @@ export default function DayDetailPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          deleteMeal.mutate(meal.id)
+                          handleDeleteMeal(meal.id)
                         }}
-                        className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        disabled={isDeletingMeal(meal.id)}
+                        className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -306,9 +356,10 @@ export default function DayDetailPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            deleteWater.mutate(w.id)
+                            handleDeleteWater(w.id)
                           }}
-                          className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                          disabled={isDeletingWater(w.id)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity disabled:opacity-50"
                         >
                           <Trash2 className="size-3" />
                         </button>
@@ -364,11 +415,8 @@ export default function DayDetailPage() {
                   <Button
                     variant="gradient"
                     size="sm"
-                    onClick={async () => {
-                      await saveNote.mutateAsync({ date: date!, notes: noteDraft })
-                      setEditingNote(false)
-                    }}
-                    disabled={saveNote.isPending}
+                    onClick={handleSaveNote}
+                    disabled={saveNote.isPending || savingNote}
                   >
                     Save
                   </Button>

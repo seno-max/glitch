@@ -13,6 +13,7 @@ import { TemplatePickerSheet } from '@/components/workout/template-picker-sheet'
 import { useWorkoutLogStore } from '@/stores/workout-log.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSaveWorkoutLog, useWorkoutSessionDetail, useDeleteWorkoutSession } from '@/hooks/use-workout'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import { WORKOUT_TYPES } from '@/constants/workout'
 import { cn } from '@/lib/utils'
 import { formatDurationHM, todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
@@ -99,7 +100,15 @@ export default function WorkoutLogPage() {
 
   const canSave = date && entryTime && exitTime && workoutTypes.length > 0 && !!durationLabel && isWithinEditWindow(date)
 
-  const handleSave = async () => {
+  // Guards against the classic "tapped Save twice" double-submit bug: the
+  // mutation's own isPending flag disables the button, but that disable
+  // only takes effect after a render/paint, which isn't fast enough to
+  // beat a real double-tap. useSingleFlight adds a synchronous ref-based
+  // lock so the second tap's handler call is a no-op instead of firing a
+  // second insert (which was creating two workout_sessions rows for the
+  // same day). Both hooks are declared unconditionally, before any early
+  // return below, so React's hook-call order stays stable across renders.
+  const [handleSave, savingInFlight] = useSingleFlight(async () => {
     if (!user || !canSave) {
       if (!durationLabel) toast.error('Exit time must be after entry time')
       return
@@ -111,20 +120,20 @@ export default function WorkoutLogPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save workout')
     }
-  }
+  })
+
+  const [handleDelete, deletingInFlight] = useSingleFlight(async () => {
+    if (!sessionId) return
+    await deleteWorkoutSession.mutateAsync(sessionId)
+    reset()
+    navigate('/workout')
+  })
 
   if (isEditing && loadingSession && !loaded) {
     return <p className="text-sm text-muted-foreground text-center py-12">Loading workout...</p>
   }
 
   const readOnly = isEditing && !!sessionDetail?.session && !isWithinEditWindow(sessionDetail.session.date)
-
-  const handleDelete = async () => {
-    if (!sessionId) return
-    await deleteWorkoutSession.mutateAsync(sessionId)
-    reset()
-    navigate('/workout')
-  }
 
   return (
     <div className="space-y-6">
@@ -234,12 +243,12 @@ export default function WorkoutLogPage() {
       {!readOnly && (
         <div className="flex gap-3">
           {isEditing && (
-            <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteWorkoutSession.isPending}>
+            <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteWorkoutSession.isPending || deletingInFlight}>
               <Trash2 className="size-4" /> Delete
             </Button>
           )}
-          <Button variant="gradient" size="lg" className="flex-1" onClick={handleSave} disabled={!canSave || saveWorkoutLog.isPending}>
-            <Save className="size-4" /> {saveWorkoutLog.isPending ? 'Saving...' : isEditing ? 'Update Workout' : 'Save Workout'}
+          <Button variant="gradient" size="lg" className="flex-1" onClick={handleSave} disabled={!canSave || saveWorkoutLog.isPending || savingInFlight}>
+            <Save className="size-4" /> {saveWorkoutLog.isPending || savingInFlight ? 'Saving...' : isEditing ? 'Update Workout' : 'Save Workout'}
           </Button>
         </div>
       )}

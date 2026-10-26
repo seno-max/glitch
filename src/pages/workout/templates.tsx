@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select'
 import { useWorkoutTemplates } from '@/hooks/use-workout'
 import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
+import { useSingleFlight, useKeyedSingleFlight } from '@/hooks/use-single-flight'
 import toast from 'react-hot-toast'
 
 const CATEGORIES = ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Push', 'Pull', 'Upper', 'Lower', 'Full Body', 'Custom']
@@ -24,7 +25,6 @@ export default function WorkoutTemplatesPage() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Custom')
   const [exercises, setExercises] = useState<string[]>([''])
-  const [saving, setSaving] = useState(false)
 
   const reset = () => {
     setName('')
@@ -32,9 +32,8 @@ export default function WorkoutTemplatesPage() {
     setExercises([''])
   }
 
-  const handleCreate = async () => {
+  const [handleCreate, saving] = useSingleFlight(async () => {
     if (!user || !name.trim()) return
-    setSaving(true)
     try {
       await workoutService.createTemplate(
         { user_id: user.id, name, category, description: null, is_custom: true },
@@ -48,15 +47,13 @@ export default function WorkoutTemplatesPage() {
       reset()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create template')
-    } finally {
-      setSaving(false)
     }
-  }
+  })
 
-  const handleDelete = async (id: string) => {
+  const [handleDelete, isDeleting] = useKeyedSingleFlight(async (id: string) => {
     await workoutService.deleteTemplate(id)
     queryClient.invalidateQueries({ queryKey: ['workout-templates'] })
-  }
+  })
 
   return (
     <div className="space-y-6">
@@ -81,7 +78,7 @@ export default function WorkoutTemplatesPage() {
                   <p className="font-semibold">{t.name}</p>
                   {t.category && <Badge variant="outline" className="mt-1">{t.category}</Badge>}
                 </div>
-                <button onClick={() => handleDelete(t.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => handleDelete(t.id)} disabled={isDeleting(t.id)} className="text-muted-foreground hover:text-destructive disabled:opacity-50">
                   <Trash2 className="size-4" />
                 </button>
               </CardContent>

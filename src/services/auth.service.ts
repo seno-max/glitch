@@ -1,11 +1,31 @@
 import { supabase } from '@/lib/supabase'
+import { Capacitor } from '@capacitor/core'
+
+/**
+ * The deep-link scheme registered in the Android manifest's VIEW intent
+ * filter. Password-reset and email-confirmation emails redirect to this
+ * scheme on native so the link opens the app (handled by the appUrlOpen
+ * listener in App.tsx) instead of a dead browser page.
+ */
+export const APP_SCHEME = 'fittrack'
+
+/** The redirect URL for auth emails, per platform. */
+export function authRedirectUrl(path: string): string {
+  if (Capacitor.isNativePlatform()) return `${APP_SCHEME}://${path.replace(/^\//, '')}`
+  return `${window.location.origin}${path}`
+}
 
 export const authService = {
   async signUp(email: string, password: string, fullName: string) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        // On native, the confirmation link opens the app via the deep-link
+        // scheme; on web it returns to the deployed site (root).
+        emailRedirectTo: authRedirectUrl('/'),
+      },
     })
     if (error) throw error
     return data

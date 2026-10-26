@@ -8,21 +8,9 @@ import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '@/components/shared/empty-state'
 import { AnimatedCheckbox } from '@/components/ui/animated-checkbox'
 import { useCheckInHabit, useUncheckHabit } from '@/hooks/use-habits'
+import { useKeyedSingleFlight } from '@/hooks/use-single-flight'
 import { celebrateBig } from '@/utils/confetti'
 import type { HabitProgress } from '@/types/models'
-
-// Rotating palette so habit tiles feel lively even before a user picks a
-// custom color — cycles deterministically by position.
-const HABIT_GRADIENTS = [
-  'from-orange-400 to-pink-500',
-  'from-sky-400 to-blue-600',
-  'from-emerald-400 to-teal-600',
-  'from-violet-400 to-purple-600',
-  'from-amber-400 to-orange-500',
-  'from-rose-400 to-red-500',
-  'from-cyan-400 to-teal-600',
-  'from-fuchsia-400 to-purple-600',
-]
 
 /**
  * Dashboard widget: check off today's habits. Habits themselves are
@@ -33,6 +21,12 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
   const navigate = useNavigate()
   const checkIn = useCheckInHabit()
   const uncheck = useUncheckHabit()
+  const [handleCheckIn, isCheckingIn] = useKeyedSingleFlight(async (_habitId: string, habit: HabitProgress['habit']) => {
+    await checkIn.mutateAsync(habit)
+  })
+  const [handleUncheck, isUnchecking] = useKeyedSingleFlight(async (habitId: string) => {
+    await uncheck.mutateAsync(habitId)
+  })
   const allDone = habitsToday.length > 0 && habitsToday.every((h) => h.completed)
   // Tracks whether we've already fired the celebration for *this specific*
   // all-done moment. Initialized from the current state (not `false`) so
@@ -96,12 +90,7 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
               transition={{ delay: i * 0.05 }}
               className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-muted transition-colors"
             >
-              <div
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-xl shrink-0 text-lg shadow-md bg-gradient-to-br',
-                  HABIT_GRADIENTS[i % HABIT_GRADIENTS.length]
-                )}
-              >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0 text-lg bg-muted">
                 {hp.habit.icon}
               </div>
               <div className="flex-1 min-w-0">
@@ -116,8 +105,8 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    onClick={() => uncheck.mutate(hp.habit.id)}
-                    disabled={uncheck.isPending}
+                    onClick={() => handleUncheck(hp.habit.id)}
+                    disabled={isUnchecking(hp.habit.id)}
                     title="Remove one check"
                   >
                     <Minus className="size-3.5" />
@@ -125,9 +114,9 @@ export function HabitsCard({ habitsToday }: { habitsToday: HabitProgress[] }) {
                 )}
                 <AnimatedCheckbox
                   checked={hp.completed}
-                  onToggle={() => checkIn.mutate(hp.habit)}
-                  disabled={checkIn.isPending || hp.checkedCount >= hp.habit.target_count}
-                  gradient={HABIT_GRADIENTS[i % HABIT_GRADIENTS.length].replace('from-', 'bg-gradient-to-br from-')}
+                  onToggle={() => handleCheckIn(hp.habit.id, hp.habit)}
+                  disabled={isCheckingIn(hp.habit.id) || hp.checkedCount >= hp.habit.target_count}
+                  gradient="bg-gradient-to-br from-emerald-400 to-teal-600"
                   size={30}
                 />
               </div>

@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useHabits, useCreateHabit, useUpdateHabit, useDeleteHabit } from '@/hooks/use-habits'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import type { Habit } from '@/types/database.types'
 
 const EMOJI_CHOICES = ['⭐', '💧', '🧘', '🚶', '🐕', '📚', '🧹', '🎯', '🧠', '🎸', '☀️', '🌙', '🥗', '🚭', '💊', '🧴', '🎨', '🙏']
@@ -50,7 +51,7 @@ export function HabitManager() {
     setDialogOpen(true)
   }
 
-  const handleSave = async () => {
+  const [handleSave, savingInFlight] = useSingleFlight(async () => {
     if (!form.name.trim()) return
     const payload = {
       name: form.name.trim(),
@@ -64,7 +65,7 @@ export function HabitManager() {
       await createHabit.mutateAsync(payload)
     }
     setDialogOpen(false)
-  }
+  })
 
   const handleDelete = async () => {
     if (!editing) return
@@ -187,7 +188,7 @@ export function HabitManager() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="gradient" onClick={handleSave} disabled={!form.name.trim() || createHabit.isPending || updateHabit.isPending}>
+            <Button variant="gradient" onClick={handleSave} disabled={!form.name.trim() || createHabit.isPending || updateHabit.isPending || savingInFlight}>
               {editing ? 'Save Changes' : 'Create Habit'}
             </Button>
           </DialogFooter>

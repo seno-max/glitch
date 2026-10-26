@@ -4,6 +4,7 @@ import { workoutService } from '@/services/workout.service'
 import { trackingService } from '@/services/tracking.service'
 import { nutritionService } from '@/services/nutrition.service'
 import { profileService } from '@/services/profile.service'
+import { notificationService } from '@/services/notification.service'
 import { todayStr } from '@/utils/date'
 import { celebrateBig } from '@/utils/confetti'
 import toast from 'react-hot-toast'
@@ -138,6 +139,18 @@ export async function checkAndUnlockAchievements(userId: string): Promise<string
     celebrateBig()
     for (const a of names) {
       toast.success(`${a.icon ?? '🏆'} Achievement unlocked: ${a.name}!`)
+      // Record it in the app's notification center so the bell shows the
+      // unread badge and the notification panel lists it.
+      try {
+        await notificationService.create(
+          userId,
+          'achievement_unlocked',
+          `Achievement unlocked: ${a.name}`,
+          a.description ?? undefined
+        )
+      } catch {
+        /* notifications are best-effort */
+      }
     }
   }
 

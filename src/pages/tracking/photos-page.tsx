@@ -1,12 +1,15 @@
 import { useState, useRef } from 'react'
-import { Camera, Upload } from 'lucide-react'
+import { Camera, Upload, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
-import { useProgressPhotos, useUploadProgressPhoto } from '@/hooks/use-tracking'
-import { todayStr } from '@/utils/date'
-import type { PhotoAngle } from '@/types/database.types'
+import { PhotoViewer } from '@/components/tracking/photo-viewer'
+import { useProgressPhotos, useUploadProgressPhoto, useDeleteProgressPhoto } from '@/hooks/use-tracking'
+import { useSingleFlight } from '@/hooks/use-single-flight'
+import { todayStr, isWithinEditWindow } from '@/utils/date'
+import type { PhotoAngle, ProgressPhoto } from '@/types/database.types'
 import { format, parseISO } from 'date-fns'
 import { trackingService } from '@/services/tracking.service'
 import { useQuery } from '@tanstack/react-query'
@@ -19,17 +22,34 @@ function PhotoThumb({ path }: { path: string }) {
 export default function PhotosPage() {
   const { data: photos, isLoading } = useProgressPhotos()
   const upload = useUploadProgressPhoto()
+  const deletePhoto = useDeleteProgressPhoto()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [angle, setAngle] = useState<PhotoAngle>('front')
   const [compareA, setCompareA] = useState<string>('')
   const [compareB, setCompareB] = useState<string>('')
   const [sliderPos, setSliderPos] = useState(50)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; path: string; date: string } | null>(null)
+  const [viewerIndex, setViewerIndex] = useState(-1)
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [handleFileSelect, uploadingInFlight] = useSingleFlight(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     await upload.mutateAsync({ date: todayStr(), angle, file })
     e.target.value = ''
+  })
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    await deletePhoto.mutateAsync(deleteTarget)
+    // If the deleted photo was open in the viewer, close it -- the gallery
+    // is about to shrink by one and the current index may no longer point
+    // at the right photo.
+    setViewerIndex(-1)
+    setDeleteTarget(null)
+  }
+
+  const requestDeleteFromViewer = (photo: ProgressPhoto) => {
+    setDeleteTarget({ id: photo.id, path: photo.storage_path, date: photo.date })
   }
 
   const urlFor = (path: string) => trackingService.getProgressPhotoUrl(path)
@@ -54,7 +74,7 @@ export default function PhotosPage() {
             <option value="side">Side</option>
             <option value="back">Back</option>
           </Select>
-          <Button variant="gradient" onClick={() => fileInputRef.current?.click()} disabled={upload.isPending}>
+          <Button variant="gradient" onClick={() => fileInputRef.current?.click()} disabled={upload.isPending || uploadingInFlight}>
             <Upload className="size-4" /> Upload Photo
           </Button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
@@ -115,14 +135,32 @@ export default function PhotosPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {photos.map((photo) => (
-                  <div key={photo.id} className="aspect-[3/4] rounded-xl overflow-hidden bg-muted relative">
-                    <PhotoThumb path={photo.storage_path} />
-                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                      {format(parseISO(photo.date), 'MMM d')}
-                    </span>
-                  </div>
-                ))}
+                {photos.map((photo, i) => {
+                  const deletable = isWithinEditWindow(photo.date)
+                  return (
+                    <div key={photo.id} className="aspect-[3/4] rounded-xl overflow-hidden bg-muted relative group">
+                      <button
+                        onClick={() => setViewerIndex(i)}
+                        className="absolute inset-0 h-full w-full cursor-zoom-in transition-transform group-hover:scale-[1.03]"
+                        title="View photo"
+                      >
+                        <PhotoThumb path={photo.storage_path} />
+                      </button>
+                      <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded pointer-events-none">
+                        {format(parseISO(photo.date), 'MMM d')}
+                      </span>
+                      {deletable && (
+                        <button
+                          onClick={() => setDeleteTarget({ id: photo.id, path: photo.storage_path, date: photo.date })}
+                          className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-destructive transition-colors"
+                          title="Delete photo"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -130,6 +168,23 @@ export default function PhotosPage() {
       ) : (
         <EmptyState icon={Camera} title="No photos yet" description="Upload your first progress photo to start tracking visually." />
       )}
+
+      <PhotoViewer
+        photos={photos ?? []}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerIndex(-1)}
+        onRequestDelete={requestDeleteFromViewer}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete this photo?"
+        description={deleteTarget ? `The photo from ${format(parseISO(deleteTarget.date), 'MMM d, yyyy')} will be permanently removed.` : undefined}
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

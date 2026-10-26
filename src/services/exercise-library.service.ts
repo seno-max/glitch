@@ -45,4 +45,10 @@ export const exerciseLibraryService = {
     if (error) throw error
     return data as unknown as ExerciseLibraryItem
   },
+
+  /** Deletes the user's own custom exercise (global/seeded ones can't be deleted). */
+  async deleteCustom(id: string): Promise<void> {
+    const { error } = await supabase.from('exercise_library').delete().eq('id', id)
+    if (error) throw error
+  },
 }

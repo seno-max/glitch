@@ -9,7 +9,7 @@ import { AuthLayout } from '@/components/layout/auth-layout'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { authService } from '@/services/auth.service'
+import { authService, authRedirectUrl } from '@/services/auth.service'
 
 const schema = z.object({ email: z.string().email('Enter a valid email address') })
 type FormValues = z.infer<typeof schema>
@@ -24,7 +24,9 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await authService.resetPasswordForEmail(values.email, `${window.location.origin}/reset-password`)
+      // On native this is the fittrack:// deep-link scheme (the emailed
+      // link opens the app); on web it's the deployed site's /reset-password.
+      await authService.resetPasswordForEmail(values.email, authRedirectUrl('/reset-password'))
       setSent(true)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send reset email')

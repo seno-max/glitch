@@ -286,4 +286,41 @@ export const trackingService = {
     if (error) throw error
     return data as unknown as DailyRoutine
   },
+
+  // ---------------- Rest Days (per-date streak freeze) ----------------
+  /** All dates the user has frozen as rest days (any order). */
+  async getRestDayLogs(userId: string): Promise<{ id: string; date: string; note: string | null }[]> {
+    const { data, error } = await supabase
+      .from('rest_day_logs')
+      .select('id, date, note')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as unknown as { id: string; date: string; note: string | null }[]
+  },
+
+  /** Whether a specific date is currently frozen as a rest day. */
+  async isRestDay(userId: string, date: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('rest_day_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return !!data
+  },
+
+  async addRestDay(userId: string, date: string, note?: string): Promise<void> {
+    const { error } = await supabase
+      .from('rest_day_logs')
+      .upsert({ user_id: userId, date, note: note ?? null }, { onConflict: 'user_id,date' })
+    if (error) throw error
+  },
+
+  async deleteRestDay(userId: string, date: string): Promise<void> {
+    const { error } = await supabase.from('rest_day_logs').delete().eq('user_id', userId).eq('date', date)
+    if (error) throw error
+  },
 }

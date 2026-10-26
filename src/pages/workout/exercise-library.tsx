@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Search, Dumbbell, Flame } from 'lucide-react'
+import { Search, Dumbbell, Flame, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { exerciseLibraryService } from '@/services/exercise-library.service'
+import { useAuthStore } from '@/stores/auth.store'
 import type { EquipmentType } from '@/types/database.types'
 import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
 
 const MUSCLES = ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core', 'Full Body', 'Hips', 'Cardio']
 const EQUIPMENT: EquipmentType[] = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'band', 'other']
@@ -19,11 +22,14 @@ const CATEGORIES = ['Cardio', 'HIIT', 'Chest', 'Back', 'Shoulders', 'Legs', 'Arm
 
 export default function ExerciseLibraryPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [muscle, setMuscle] = useState('')
   const [equipment, setEquipment] = useState('')
   const [category, setCategory] = useState('')
   const [cardioOnly, setCardioOnly] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['exercise-library', search, muscle, equipment, category, cardioOnly],
@@ -35,6 +41,18 @@ export default function ExerciseLibraryPage() {
         category: !cardioOnly ? category || undefined : undefined,
       }),
   })
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await exerciseLibraryService.deleteCustom(deleteTarget.id)
+      queryClient.invalidateQueries({ queryKey: ['exercise-library'] })
+      toast.success(`"${deleteTarget.name}" deleted`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete exercise')
+    }
+    setDeleteTarget(null)
+  }
 
   const toggleCardio = () => {
     setCardioOnly((v) => !v)
@@ -96,7 +114,19 @@ export default function ExerciseLibraryPage() {
       ) : data && data.length > 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {data.map((ex) => (
-            <Card key={ex.id} className="card-hover cursor-pointer" onClick={() => navigate(`/workout/exercises/${encodeURIComponent(ex.name)}`)}>
+            <Card key={ex.id} className="card-hover cursor-pointer relative" onClick={() => navigate(`/workout/exercises/${encodeURIComponent(ex.name)}`)}>
+              {user && ex.is_custom && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteTarget({ id: ex.id, name: ex.name })
+                  }}
+                  className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-muted-foreground hover:bg-destructive hover:text-white transition-colors"
+                  title="Delete custom exercise"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              )}
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <p className="font-semibold">{ex.name}</p>
@@ -116,6 +146,15 @@ export default function ExerciseLibraryPage() {
       ) : (
         <EmptyState icon={Dumbbell} title="No exercises found" description="Try a different search or filter." />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete this custom exercise?"
+        description={deleteTarget ? `"${deleteTarget.name}" will be removed from your library. Workouts that already logged it are unaffected.` : undefined}
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

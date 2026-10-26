@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth.store'
 import { workoutService } from '@/services/workout.service'
+import { trackingService } from '@/services/tracking.service'
 import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
 import { gamificationService } from '@/services/gamification.service'
 import { profileService } from '@/services/profile.service'
 import { checkAndUnlockAchievements } from '@/services/achievements.engine'
+import { updateChallengeProgressForUser } from '@/services/challenge-progress.engine'
 import { todayStr } from '@/utils/date'
 import { celebrateBig } from '@/utils/confetti'
 import type { WorkoutType, StrengthExercise } from '@/types/database.types'
@@ -97,6 +99,11 @@ export function useSaveWorkoutLog() {
 
       const settings = await profileService.getSettings(user.id)
 
+      // Per-date rest days (streak freeze) the user has marked, bridged over
+      // by the gym streak alongside the repeating weekday rest-day pattern.
+      const restDayLogs = await trackingService.getRestDayLogs(user.id)
+      const frozenDates = restDayLogs.map((r) => r.date)
+
       // Replace exercises: delete existing (if editing) then re-insert.
       if (input.sessionId) {
         const existing = await workoutService.getStrengthExercisesBySession(input.sessionId)
@@ -135,6 +142,7 @@ export function useSaveWorkoutLog() {
           streakDays: settings?.gym_streak_days ?? 5,
           streakPoints: settings?.gym_streak_points ?? 0,
           restDays: settings?.rest_days ?? [],
+          frozenDates,
         }
       )
       await awardDailyPoints(
@@ -145,10 +153,14 @@ export function useSaveWorkoutLog() {
       )
 
       for (const ex of savedExercises) {
-        await checkStrengthPR(ex)
+        await checkStrengthPR(ex, input.date)
       }
 
       await checkAndUnlockAchievements(user.id)
+
+      // Auto-progress any active custom challenges (gym_days / cardio
+      // metrics) and complete + reward them when targets are reached.
+      await updateChallengeProgressForUser(user.id, settings)
 
       return {
         session,
@@ -177,30 +189,75 @@ export function useDeleteWorkoutSession() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (sessionId: string) => workoutService.deleteSession(sessionId),
-    onSuccess: async () => {
+    mutationFn: async (sessionId: string) => {
+      // Capture the session's date before deleting — needed to revoke the
+      // points that were awarded for completing a workout on that day.
+      const session = await workoutService.getSessionById(sessionId)
+      await workoutService.deleteSession(sessionId)
+      return { date: session?.date ?? null }
+    },
+    onSuccess: async ({ date }) => {
       toast.success('Workout deleted')
       if (user) {
         // Recompute the gym streak from what's actually left after the
         // deletion, in case the deleted session was part of the current
         // or longest streak.
         const settings = await profileService.getSettings(user.id)
+        const restDayLogs = await trackingService.getRestDayLogs(user.id)
+
+        // Revoke the points earned for completing a workout on the deleted
+        // session's date: the gym_completed award itself plus any gym
+        // streak bonus/streak-reward entries keyed to that date (the bonus
+        // only stands if the workout that crossed the threshold does).
+        if (date) {
+          const ledgerEntries = await gamificationService.getPointsInRange(user.id, date, date)
+          const revocable = ledgerEntries.filter(
+            (e) => e.reason === 'gym_completed' || e.reason.startsWith('streak_reward_') || /^streak_\d+_days_gym$/.test(e.reason)
+          )
+          let revoked = 0
+          for (const entry of revocable) {
+            await gamificationService.removePointsLedgerEntry(entry.id)
+            revoked += entry.points
+          }
+          // Subtract the revoked points from XP too (atomically), so the
+          // level doesn't stay inflated after the deletion.
+          if (revoked > 0) {
+            try {
+              await gamificationService.addXp(user.id, -revoked)
+            } catch {
+              /* best-effort */
+            }
+          }
+        }
+
         const remaining = (await workoutService.getSessionsInRange(user.id, '2000-01-01', todayStr())).filter((s) => s.is_completed).map((s) => s.date)
-        await updateStreak(user.id, 'gym', remaining, { streakDays: settings?.gym_streak_days ?? 5, streakPoints: 0, restDays: settings?.rest_days ?? [] })
+        await updateStreak(user.id, 'gym', remaining, {
+          streakDays: settings?.gym_streak_days ?? 5,
+          streakPoints: 0,
+          restDays: settings?.rest_days ?? [],
+          frozenDates: restDayLogs.map((r) => r.date),
+        })
       }
       queryClient.invalidateQueries({ queryKey: ['workout-history'] })
+      queryClient.invalidateQueries({ queryKey: ['workout-session-detail'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
       queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['challenges'] })
     },
   })
 }
 
-async function checkStrengthPR(ex: StrengthExercise) {
+async function checkStrengthPR(ex: StrengthExercise, workoutDate: string) {
   try {
     if (!ex.weight_kg) return
-    const best = await gamificationService.getBestPersonalRecord(ex.user_id, 'highest_weight')
+    // Per-exercise PR: compare against the best record for THIS exercise
+    // (keyed by the record's context column), not the all-time max across
+    // every lift -- otherwise the first time any exercise exceeds your
+    // global max would fire a bogus "New PR" for an unrelated movement,
+    // and a brand-new exercise could never set its own baseline.
+    const best = await gamificationService.getBestPersonalRecordForContext(ex.user_id, 'highest_weight', ex.exercise_name)
     if (!best || ex.weight_kg > best.value) {
       await gamificationService.recordPersonalRecord({
         user_id: ex.user_id,
@@ -208,7 +265,9 @@ async function checkStrengthPR(ex: StrengthExercise) {
         value: ex.weight_kg,
         unit: 'kg',
         context: ex.exercise_name,
-        achieved_date: todayStr(),
+        // Use the workout's own date, not today -- a backdated PR should
+        // be recorded as achieved on the day it was actually performed.
+        achieved_date: workoutDate,
         meta: {},
       })
       toast.success(`🏆 New PR! ${ex.exercise_name}: ${ex.weight_kg}kg`)

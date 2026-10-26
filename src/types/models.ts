@@ -136,6 +136,17 @@ export function getLevelForXp(xp: number): { level: number; xpIntoLevel: number;
     }
   }
 
+  // Beyond the seeded level-10 threshold the thresholds keep growing by
+  // (level+1)*2000 — without this loop the displayed level silently capped
+  // at 10 forever. Mirrors add_xp_atomic in supabase/migrations/0013.
+  while (xp >= next.xp) {
+    current = next
+    next = {
+      level: current.level + 1,
+      xp: current.xp + (current.level + 1) * 2000,
+    }
+  }
+
   const span = next.xp - current.xp
   const into = xp - current.xp
   const progressPct = span > 0 ? Math.min(100, Math.round((into / span) * 100)) : 100

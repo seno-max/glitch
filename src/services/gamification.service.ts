@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase'
-import { getLevelForXp } from '@/types/models'
 import type {
   PointsLedgerEntry,
   Streak,
@@ -42,6 +41,12 @@ export const gamificationService = {
     return !!data
   },
 
+  /** Removes a single ledger entry (used to revoke points when the underlying activity is deleted). */
+  async removePointsLedgerEntry(id: string): Promise<void> {
+    const { error } = await supabase.from('points_ledger').delete().eq('id', id)
+    if (error) throw error
+  },
+
   async getPointsInRange(userId: string, startDate: string, endDate: string): Promise<PointsLedgerEntry[]> {
     const { data, error } = await supabase
       .from('points_ledger')
@@ -61,16 +66,20 @@ export const gamificationService = {
   },
 
   // ---------------- XP (profile) ----------------
-  async addXp(userId: string, xpDelta: number): Promise<{ xp: number; level: number }> {
-    const { data: profile, error: fetchError } = await supabase.from('profiles').select('xp,level').eq('id', userId).single()
-    if (fetchError) throw fetchError
-    const newXp = (profile.xp as number) + xpDelta
-
-    const { level } = getLevelForXp(newXp)
-
-    const { error } = await supabase.from('profiles').update({ xp: newXp, level }).eq('id', userId)
+  /**
+   * Atomically increments XP via the add_xp_atomic Postgres RPC. The old
+   * client-side read-modify-write could silently lose XP when two concurrent
+   * awards (e.g. a workout save + a habit check-in) both read the same
+   * starting value; the RPC's UPDATE takes a row lock so concurrent calls
+   * serialize and every delta lands. The RPC identifies the caller by
+   * auth.uid(), so _userId is accepted for API compatibility only.
+   */
+  async addXp(_userId: string, xpDelta: number): Promise<{ xp: number; level: number }> {
+    const { data, error } = await supabase.rpc('add_xp_atomic', { p_xp_delta: Math.round(xpDelta) })
     if (error) throw error
-    return { xp: newXp, level }
+    const row = Array.isArray(data) ? data[0] : (data as { xp: number; level: number } | null)
+    if (!row) throw new Error('add_xp_atomic returned no row')
+    return { xp: Number(row.xp), level: Number(row.level) }
   },
 
   // ---------------- Streaks ----------------
@@ -140,6 +149,26 @@ export const gamificationService = {
       .select('*')
       .eq('user_id', userId)
       .eq('category', category)
+      .order('value', { ascending: category === 'lowest_weight' })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return data as unknown as PersonalRecord | null
+  },
+
+  /**
+   * Best record within a category for a specific context (e.g. an exercise
+   * name for 'highest_weight'). Per-exercise PRs are keyed by the `context`
+   * column so a deadlift PR never fires because you benched more, and a new
+   * exercise always starts its own PR history from scratch.
+   */
+  async getBestPersonalRecordForContext(userId: string, category: PRCategory, context: string): Promise<PersonalRecord | null> {
+    const { data, error } = await supabase
+      .from('personal_records')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('category', category)
+      .eq('context', context)
       .order('value', { ascending: category === 'lowest_weight' })
       .limit(1)
       .maybeSingle()

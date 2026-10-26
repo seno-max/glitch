@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWeightHistory, useLogWeight, useDeleteWeightLog } from '@/hooks/use-tracking'
+import { useSingleFlight, useKeyedSingleFlight } from '@/hooks/use-single-flight'
 import { useAuthStore } from '@/stores/auth.store'
 import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO, subDays } from 'date-fns'
@@ -47,7 +48,7 @@ export default function WeightPage() {
   const totalChange = latest && first ? Math.round((latest.weight_kg - first.weight_kg) * 10) / 10 : null
   const goalWeight = profile?.goal_weight_kg
 
-  const handleLog = async () => {
+  const [handleLog, logging] = useSingleFlight(async () => {
     if (!weight || !date) return
     await logWeight.mutateAsync({
       date,
@@ -60,7 +61,11 @@ export default function WeightPage() {
       notes: null,
     })
     setWeight('')
-  }
+  })
+
+  const [handleDeleteEntry, isDeletingEntry] = useKeyedSingleFlight(async (id: string) => {
+    await deleteWeight.mutateAsync(id)
+  })
 
   const recentEntries = sortedByDate.slice().reverse().slice(0, 15)
 
@@ -114,7 +119,7 @@ export default function WeightPage() {
               <Input type="number" step="0.1" placeholder="e.g. 72.5" value={weight} onChange={(e) => setWeight(e.target.value)} />
             </div>
           </div>
-          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!weight || !date || !editable || logWeight.isPending}>
+          <Button variant="gradient" className="w-full" onClick={handleLog} disabled={!weight || !date || !editable || logWeight.isPending || logging}>
             Save Entry
           </Button>
         </CardContent>
@@ -172,8 +177,8 @@ export default function WeightPage() {
                           variant="ghost"
                           size="icon-sm"
                           className="text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteWeight.mutate(entry.id)}
-                          disabled={deleteWeight.isPending}
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          disabled={isDeletingEntry(entry.id)}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

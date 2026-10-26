@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useSleepHistory, useLogSleep } from '@/hooks/use-tracking'
+import { useSingleFlight, useKeyedSingleFlight } from '@/hooks/use-single-flight'
 import { trackingService } from '@/services/tracking.service'
 import { useQueryClient } from '@tanstack/react-query'
 import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
@@ -57,7 +58,7 @@ export default function SleepPage() {
 
   const editable = isWithinEditWindow(date)
 
-  const handleLog = async () => {
+  const [handleLog, logging] = useSingleFlight(async () => {
     const sleepDateTime = new Date(`${date}T${sleepTime}:00`)
     let wakeDateTime = new Date(`${date}T${wakeTime}:00`)
     if (wakeDateTime <= sleepDateTime) wakeDateTime = new Date(wakeDateTime.getTime() + 24 * 60 * 60 * 1000)
@@ -69,9 +70,9 @@ export default function SleepPage() {
       quality,
       notes: null,
     })
-  }
+  })
 
-  const handleDelete = async (id: string) => {
+  const [handleDelete, isDeletingLog] = useKeyedSingleFlight(async (id: string) => {
     await trackingService.deleteSleepLog(id)
     queryClient.invalidateQueries({ queryKey: ['sleep-history'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -79,7 +80,7 @@ export default function SleepPage() {
     queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
     queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
     toast.success('Sleep entry deleted')
-  }
+  })
 
   const recent = sorted.slice().reverse().slice(0, 14)
 
@@ -116,7 +117,7 @@ export default function SleepPage() {
               <option value="very_poor">Very Poor</option>
             </Select>
           </div>
-          <Button variant="gradient" className="col-span-2 sm:col-span-4" onClick={handleLog} disabled={!editable || logSleep.isPending}>
+          <Button variant="gradient" className="col-span-2 sm:col-span-4" onClick={handleLog} disabled={!editable || logSleep.isPending || logging}>
             Save Sleep Log
           </Button>
         </CardContent>
@@ -178,6 +179,7 @@ export default function SleepPage() {
                           size="icon-sm"
                           className="text-muted-foreground hover:text-destructive"
                           onClick={() => handleDelete(log.id)}
+                          disabled={isDeletingLog(log.id)}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

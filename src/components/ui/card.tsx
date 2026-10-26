@@ -1,12 +1,31 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+/**
+ * Card "weight" gives the UI a visual hierarchy instead of every card
+ * looking identical regardless of importance:
+ *  - flat: subtle border, no shadow — lists, settings rows, secondary content
+ *  - default: the original card look (border + soft shadow) — general content
+ *  - raised: stronger shadow, no visible border — today's key stat / featured content
+ * Purely a presentational prop; does not affect any data or logic.
+ */
+const CARD_WEIGHT = {
+  flat: 'border border-border bg-card shadow-none',
+  default: 'border border-border bg-card shadow-sm',
+  raised: 'border border-transparent bg-card shadow-lg shadow-black/5 dark:shadow-black/20',
+} as const
+
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  weight?: keyof typeof CARD_WEIGHT
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, weight = 'default', ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        'rounded-2xl border border-border bg-card text-card-foreground shadow-sm',
+        'rounded-2xl text-card-foreground',
+        CARD_WEIGHT[weight],
         className
       )}
       {...props}

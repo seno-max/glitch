@@ -98,11 +98,14 @@ app talks to a real backend)
    - `anon` public key
 
 **1.3 Run the database migrations**
-In the Supabase dashboard → **SQL Editor**, run these three files **in
-order** (copy/paste contents and run each):
+In the Supabase dashboard → **SQL Editor**, run these files **in order**
+(copy/paste contents and run each):
 - `supabase/migrations/0001_init_schema.sql`
 - `supabase/migrations/0002_seed_data.sql`
 - `supabase/migrations/0003_storage_buckets.sql`
+- `supabase/migrations/0004_cardio_hiit_exercises.sql` through
+  `supabase/migrations/0013_fixes_rest_days_xp.sql` (all remaining files,
+  in numeric order)
 
 (Alternative: use the Supabase CLI — `supabase link --project-ref <ref>`
 then `supabase db push` — if you have it installed.)
@@ -205,6 +208,12 @@ to:
 - Site URL
 - Redirect URLs (needed for password reset / email confirmation links to
   work)
+
+**Android deep links:** the Android app registers a `fittrack://` scheme.
+For password reset / email confirmation to open the app instead of the
+browser, also add these to **Redirect URLs** in Supabase:
+- `fittrack://reset-password`
+- `fittrack:///`
 
 From now on, every `git push` to `main` auto-redeploys.
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { AnalyticsSummary } from '@/types/models'
+import { parseISO } from 'date-fns'
 import { workoutService } from './workout.service'
 import { trackingService } from './tracking.service'
 import { gamificationService } from './gamification.service'
@@ -112,9 +113,12 @@ export const analyticsService = {
       : null
 
     // best week / best month by workout count
+    // NOTE: use parseISO (local-timezone) rather than new Date(str), which
+    // parses date-only strings as UTC midnight — in UTC-negative timezones
+    // that shifts the week bucket a day.
     const weekCounts: Record<string, number> = {}
     for (const s of sessions) {
-      const wk = weekRange(new Date(s.date)).start
+      const wk = weekRange(parseISO(s.date)).start
       weekCounts[wk] = (weekCounts[wk] ?? 0) + 1
     }
     const bestWeek = Object.keys(weekCounts).length
@@ -134,7 +138,7 @@ export const analyticsService = {
     // range, for a simple "this week vs last week" style bar chart.
     const weekBuckets: Record<string, { workouts: number; minutes: number }> = {}
     for (const s of sessions) {
-      const wk = weekRange(new Date(s.date)).start
+      const wk = weekRange(parseISO(s.date)).start
       if (!weekBuckets[wk]) weekBuckets[wk] = { workouts: 0, minutes: 0 }
       weekBuckets[wk].workouts += 1
       weekBuckets[wk].minutes += s.duration_minutes ?? 0

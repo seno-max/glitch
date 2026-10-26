@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth.store'
 import { trackingService } from '@/services/tracking.service'
+import { workoutService } from '@/services/workout.service'
 import { profileService } from '@/services/profile.service'
 import { updateStreak, awardDailyPoints } from '@/services/scoring.engine'
 import { gamificationService } from '@/services/gamification.service'
 import { checkAndUnlockAchievements } from '@/services/achievements.engine'
+import { updateChallengeProgressForUser } from '@/services/challenge-progress.engine'
 import { todayStr, lastNDaysRange } from '@/utils/date'
+import { compressImage } from '@/utils/image'
 import { celebrate } from '@/utils/confetti'
 import type { WeightLog, SleepLog, MoodLog, BodyMeasurement, PhotoAngle } from '@/types/database.types'
 import toast from 'react-hot-toast'
@@ -37,12 +40,21 @@ export function useAddWater() {
       if (!user) throw new Error('Not authenticated')
       return trackingService.addWaterLog(user.id, date, amountMl)
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['water'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
       queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
+      if (user) {
+        // Water can complete water_daily_goal challenges.
+        try {
+          const settings = await profileService.getSettings(user.id)
+          await updateChallengeProgressForUser(user.id, settings)
+        } catch {
+          /* best-effort */
+        }
+      }
     },
   })
 }
@@ -127,6 +139,7 @@ export function useLogWeight() {
         // Only update the dashboard's "current weight" if this log is the
         // most recent one on record (logging a backdated entry shouldn't
         // override a more recent current weight).
+        const settings = await profileService.getSettings(user.id)
         const latest = await trackingService.getLatestWeightLog(user.id)
         if (!latest || log.date >= latest.date) {
           await profileService.updateProfile(user.id, { current_weight_kg: log.weight_kg })
@@ -146,6 +159,7 @@ export function useLogWeight() {
           })
         }
         await checkAndUnlockAchievements(user.id)
+        await updateChallengeProgressForUser(user.id, settings)
       }
       celebrate()
       toast.success('Weight logged!')
@@ -208,7 +222,10 @@ export function useLogSteps() {
         if (log.steps >= stepGoal) {
           const allLogs = await trackingService.getStepLogsInRange(user.id, '2000-01-01', todayStr())
           const qualifyingDates = allLogs.filter((l) => l.steps >= stepGoal).map((l) => l.date)
-          await updateStreak(user.id, 'steps', qualifyingDates, { streakDays: 0, streakPoints: 0, restDays: settings?.rest_days ?? [] })
+          // Step streaks are STRICT: consecutive days where the step goal was
+          // met. No rest-day bridging — if a day's goal isn't hit the streak
+          // cuts and restarts the next time 10k (the goal) is reached again.
+          await updateStreak(user.id, 'steps', qualifyingDates, { streakDays: 0, streakPoints: 0 })
         }
         if (log.date === todayStr()) {
           await awardDailyPoints(
@@ -219,6 +236,7 @@ export function useLogSteps() {
           )
         }
         await checkAndUnlockAchievements(user.id)
+        await updateChallengeProgressForUser(user.id, settings)
         if (log.steps >= stepGoal) {
           celebrate()
           toast.success(`Goal smashed! ${log.steps.toLocaleString()} steps 🎯`)
@@ -328,13 +346,81 @@ export function useUploadProgressPhoto() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ date, angle, file, weightKg }: { date: string; angle: PhotoAngle; file: File; weightKg?: number }) => {
+    mutationFn: async ({ date, angle, file, weightKg }: { date: string; angle: PhotoAngle; file: File; weightKg?: number }) => {
       if (!user) throw new Error('Not authenticated')
-      return trackingService.uploadProgressPhoto(user.id, date, angle, file, weightKg)
+      // Compress before upload so camera photos don't hit Storage as raw
+      // multi-MB blobs (see utils/image.ts).
+      const compressed = await compressImage(file)
+      return trackingService.uploadProgressPhoto(user.id, date, angle, compressed, weightKg)
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['progress-photos'] })
       toast.success('Photo uploaded!')
+    },
+  })
+}
+
+export function useDeleteProgressPhoto() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, path }: { id: string; path: string }) => trackingService.deleteProgressPhoto(id, path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progress-photos'] })
+      toast.success('Photo deleted')
+    },
+  })
+}
+
+// ---------------- Rest Days (per-date streak freeze) ----------------
+export function useRestDayLogs() {
+  const { user } = useAuthStore()
+  return useQuery({
+    queryKey: ['rest-day-logs', user?.id],
+    enabled: !!user,
+    queryFn: () => trackingService.getRestDayLogs(user!.id),
+  })
+}
+
+/**
+ * Toggles a specific calendar date as a frozen rest day ("I was unwell this
+ * day — freeze the streak"). The gym streak is recomputed immediately so
+ * marking/unmarking takes effect at once instead of waiting for the next
+ * workout log.
+ */
+export function useToggleRestDay() {
+  const { user } = useAuthStore()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ date, freeze, note }: { date: string; freeze: boolean; note?: string }) => {
+      if (!user) throw new Error('Not authenticated')
+      if (freeze) {
+        await trackingService.addRestDay(user.id, date, note)
+      } else {
+        await trackingService.deleteRestDay(user.id, date)
+      }
+      return { date, freeze }
+    },
+    onSuccess: async ({ date, freeze }) => {
+      queryClient.invalidateQueries({ queryKey: ['rest-day-logs'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-month'] })
+      queryClient.invalidateQueries({ queryKey: ['day-activity-log'] })
+      if (user) {
+        // Recompute the gym streak with the updated freeze set so the
+        // widget + dashboard reflect it immediately.
+        const settings = await profileService.getSettings(user.id)
+        const restDayLogs = await trackingService.getRestDayLogs(user.id)
+        const sessions = await workoutService.getSessionsInRange(user.id, '2000-01-01', todayStr())
+        const qualifying = sessions.filter((s) => s.is_completed).map((s) => s.date)
+        await updateStreak(user.id, 'gym', qualifying, {
+          streakDays: settings?.gym_streak_days ?? 5,
+          streakPoints: 0,
+          restDays: settings?.rest_days ?? [],
+          frozenDates: restDayLogs.map((r) => r.date),
+        })
+        void date
+      }
+      toast.success(freeze ? 'Day frozen — your streak is safe' : 'Rest day removed')
     },
   })
 }

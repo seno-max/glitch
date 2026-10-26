@@ -2,6 +2,7 @@ import type { StreakCategory } from '@/types/database.types'
 import { gamificationService } from '@/services/gamification.service'
 import { habitsService } from '@/services/habits.service'
 import { streakRewardsService } from '@/services/streak-rewards.service'
+import { notificationService } from '@/services/notification.service'
 import { computeStreakFromDates, todayStr } from '@/utils/date'
 import { syncGymStreakWidget } from '@/utils/gym-streak-widget'
 import type { Habit, HabitCheckin } from '@/types/database.types'
@@ -68,11 +69,12 @@ export async function updateStreak(
   userId: string,
   category: StreakCategory,
   qualifyingDates: string[],
-  streakConfig?: { streakDays: number; streakPoints: number; restDays?: number[] }
+  streakConfig?: { streakDays: number; streakPoints: number; restDays?: number[]; frozenDates?: string[] }
 ): Promise<{ streak: number; bonusAwarded: number }> {
   const asOfDate = todayStr()
   const restDays = streakConfig?.restDays ?? []
-  const { current, longest } = computeStreakFromDates(qualifyingDates, asOfDate, restDays)
+  const frozenDates = streakConfig?.frozenDates ?? []
+  const { current, longest } = computeStreakFromDates(qualifyingDates, asOfDate, restDays, frozenDates)
   const mostRecent = qualifyingDates.slice().sort().at(-1) ?? null
 
   const existing = await gamificationService.getStreak(userId, category)
@@ -87,10 +89,26 @@ export async function updateStreak(
   })
 
   // Keep the home-screen "Gym Streak" widget in sync the instant the gym
-  // streak changes (workout logged, backfilled, or deleted) instead of
+  // streak changes (workout logged, backfilled, deleted) instead of
   // waiting for the next dashboard load.
   if (category === 'gym') {
     syncGymStreakWidget(current)
+  }
+
+  // Record a "streak milestone reached" notification in the app's
+  // notification center when the current streak crosses a configured
+  // milestone threshold (only gym streaks have milestones).
+  if (category === 'gym' && current > previousCurrent && current > 0 && current % 5 === 0) {
+    try {
+      await notificationService.create(
+        userId,
+        'general',
+        `🔥 ${current} day gym streak!`,
+        `You've kept the streak alive for ${current} days. Keep going!`
+      )
+    } catch {
+      /* notifications are best-effort */
+    }
   }
 
   // Award any *fully user-defined* streak reward for this category whose

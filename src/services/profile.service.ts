@@ -20,9 +20,20 @@ export const profileService = {
   },
 
   async getSettings(userId: string): Promise<Settings | null> {
-    const { data, error } = await supabase.from('settings').select('*').eq('user_id', userId).single()
+    const { data, error } = await supabase.from('settings').select('*').eq('user_id', userId).maybeSingle()
     if (error) throw error
-    return data as unknown as Settings
+    if (data) return data as unknown as Settings
+
+    // Auto-create a default settings row for users who signed up before the
+    // auto-create trigger existed (or if the trigger failed). Without this,
+    // every settings/dashboard query would error with "no rows".
+    const { data: created, error: upsertError } = await supabase
+      .from('settings')
+      .upsert({ user_id: userId }, { onConflict: 'user_id' })
+      .select('*')
+      .single()
+    if (upsertError) throw upsertError
+    return created as unknown as Settings
   },
 
   async updateSettings(userId: string, patch: Partial<Settings>): Promise<Settings> {

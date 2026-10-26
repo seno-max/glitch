@@ -8,6 +8,7 @@ import { useCalendarMonth } from '@/hooks/use-calendar'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/utils/haptics'
+import { todayStr } from '@/utils/date'
 import type { CalendarDayStatus } from '@/types/models'
 
 const STATUS_RING: Record<CalendarDayStatus, string> = {
@@ -82,7 +83,7 @@ export default function CalendarPage() {
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 rounded-2xl gradient-fire p-4 text-white shadow-lg"
+          className="flex items-center gap-3 rounded-2xl gradient-primary p-4 text-white shadow-lg"
         >
           <Flame className="size-6" />
           <div>
@@ -91,6 +92,16 @@ export default function CalendarPage() {
           </div>
         </motion.div>
       )}
+
+      <Card weight="flat">
+        <CardContent className="p-4 flex flex-wrap gap-4">
+          <LegendItem colorClass="from-emerald-400 to-teal-500" label="Workout" />
+          <LegendItem colorClass="from-amber-300 to-amber-500" label="Rest day" />
+          <LegendItem colorClass="from-violet-400 to-purple-500" label="Weight logged" />
+          <LegendItem colorClass="from-fuchsia-400 to-purple-600" label="Challenge completed" />
+          <LegendItem colorClass="from-amber-300 to-yellow-500" label="Personal record" />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between flex-wrap gap-2">
@@ -123,8 +134,12 @@ export default function CalendarPage() {
                 if (!day) return <div key={i} />
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                 const summary = summaries?.[dateStr]
-                const isToday = dateStr === now.toISOString().slice(0, 10)
-                const isFuture = new Date(dateStr) > now
+                // String comparisons against today's LOCAL date — the old
+                // checks (now.toISOString().slice(0,10) / new Date(dateStr) >
+                // now) were UTC-based, which marked the wrong day as "today"
+                // or "future" outside UTC.
+                const isToday = dateStr === todayStr()
+                const isFuture = dateStr > todayStr()
 
                 // For the streak "chain" visual: whether the previous/next
                 // calendar cell is also a completed gym day, so we can draw
@@ -167,19 +182,6 @@ export default function CalendarPage() {
           </motion.div>
 
           <p className="text-xs text-muted-foreground text-center mt-4">{activeDaysThisMonth} active days this month</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Legend</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <LegendItem colorClass="from-emerald-400 to-teal-500" label="Workout" />
-          <LegendItem colorClass="from-amber-300 to-amber-500" label="Rest day" />
-          <LegendItem colorClass="from-violet-400 to-purple-500" label="Weight logged" />
-          <LegendItem colorClass="from-fuchsia-400 to-purple-600" label="Challenge completed" />
-          <LegendItem colorClass="from-amber-300 to-yellow-500" label="Personal record" />
         </CardContent>
       </Card>
     </div>

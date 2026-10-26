@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Avatar } from '@/components/ui/avatar'
+import { MetricTile } from '@/components/ui/metric-tile'
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts'
 import { useAuthStore } from '@/stores/auth.store'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { useAnalyticsSummary, useAchievements } from '@/hooks/use-analytics'
 import { profileService } from '@/services/profile.service'
-import { cn } from '@/lib/utils'
+import { compressImage } from '@/utils/image'
 import toast from 'react-hot-toast'
 
 const schema = z.object({
@@ -77,7 +78,9 @@ export default function ProfilePage() {
     if (!file || !user) return
     setUploading(true)
     try {
-      const url = await profileService.uploadAvatar(user.id, file)
+      // Compress the avatar before upload (see utils/image.ts).
+      const compressed = await compressImage(file, 512, 0.85)
+      const url = await profileService.uploadAvatar(user.id, compressed)
       const updated = await profileService.updateProfile(user.id, { avatar_url: url })
       setProfile(updated)
       toast.success('Avatar updated!')
@@ -135,16 +138,16 @@ export default function ProfilePage() {
 
       {/* Streak / points stats */}
       <div className="grid grid-cols-3 gap-3">
-        <StatTile icon={Flame} value={gymStreak} label="Day Streak" gradient="from-orange-400 to-pink-500" />
-        <StatTile icon={Trophy} value={dashboard?.pointsToday ?? 0} label="Points Today" gradient="from-amber-400 to-orange-500" />
-        <StatTile icon={Star} value={dashboard?.totalPoints ?? 0} label="Total Points" gradient="from-fuchsia-400 to-purple-600" />
+        <MetricTile align="center" icon={Flame} value={gymStreak} label="Day Streak" accent="fire" />
+        <MetricTile align="center" icon={Trophy} value={dashboard?.pointsToday ?? 0} label="Points Today" accent="fire" />
+        <MetricTile align="center" icon={Star} value={dashboard?.totalPoints ?? 0} label="Total Points" accent="fire" />
       </div>
 
       {/* Fitness summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatTile icon={Dumbbell} value={yearAnalytics?.workoutHours ? Math.round((yearAnalytics.workoutHours / 1) * 10) / 10 : 0} valueSuffix="h" label="Total Hours" gradient="from-emerald-400 to-teal-600" />
-        <StatTile icon={Clock} value={yearAnalytics?.avgWorkoutMinutes ?? 0} valueSuffix="min" label="Avg Session" gradient="from-sky-400 to-blue-600" />
-        <StatTile icon={Award} value={unlockedAchievements.length} label="Achievements" gradient="from-violet-400 to-purple-600" />
+        <MetricTile align="center" icon={Dumbbell} value={`${yearAnalytics?.workoutHours ? Math.round((yearAnalytics.workoutHours / 1) * 10) / 10 : 0}h`} label="Total Hours" accent="primary" />
+        <MetricTile align="center" icon={Clock} value={`${yearAnalytics?.avgWorkoutMinutes ?? 0}min`} label="Avg Session" accent="accent" />
+        <MetricTile align="center" icon={Award} value={unlockedAchievements.length} label="Achievements" accent="secondary" />
       </div>
 
       {/* Weight progress */}
@@ -261,34 +264,5 @@ export default function ProfilePage() {
         </Card>
       </form>
     </div>
-  )
-}
-
-function StatTile({
-  icon: Icon,
-  value,
-  valueSuffix,
-  label,
-  gradient,
-}: {
-  icon: typeof Flame
-  value: number
-  valueSuffix?: string
-  label: string
-  gradient: string
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
-        <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br shadow-md', gradient)}>
-          <Icon className="size-5 text-white" />
-        </div>
-        <p className="text-lg font-bold">
-          {value}
-          {valueSuffix}
-        </p>
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-      </CardContent>
-    </Card>
   )
 }

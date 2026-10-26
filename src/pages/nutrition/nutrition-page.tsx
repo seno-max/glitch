@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { useMealsForDate, useAddMeal, useDeleteMeal } from '@/hooks/use-nutrition'
+import { useSingleFlight, useKeyedSingleFlight } from '@/hooks/use-single-flight'
 import { todayStr, earliestEditableDate, isWithinEditWindow, formatDisplayDate } from '@/utils/date'
 import type { MealType } from '@/types/database.types'
 
@@ -34,7 +35,7 @@ export default function NutritionPage() {
   const editable = isWithinEditWindow(date)
   const resetForm = () => setForm({ name: '', quantity: '' })
 
-  const handleAdd = async () => {
+  const [handleAdd, adding] = useSingleFlight(async () => {
     if (!dialogMealType || !form.name.trim()) return
     await addMeal.mutateAsync({
       date,
@@ -53,7 +54,11 @@ export default function NutritionPage() {
     })
     resetForm()
     setDialogMealType(null)
-  }
+  })
+
+  const [handleDeleteMeal, isDeletingMeal] = useKeyedSingleFlight(async (id: string) => {
+    await deleteMeal.mutateAsync(id)
+  })
 
   return (
     <div className="space-y-6">
@@ -97,7 +102,7 @@ export default function NutritionPage() {
                           {meal.quantity && <p className="text-xs text-muted-foreground">{meal.quantity}</p>}
                         </div>
                         {editable && (
-                          <button onClick={() => deleteMeal.mutate(meal.id)} className="text-muted-foreground hover:text-destructive">
+                          <button onClick={() => handleDeleteMeal(meal.id)} disabled={isDeletingMeal(meal.id)} className="text-muted-foreground hover:text-destructive disabled:opacity-50">
                             <Trash2 className="size-3.5" />
                           </button>
                         )}
@@ -124,7 +129,7 @@ export default function NutritionPage() {
             <Button variant="outline" onClick={() => setDialogMealType(null)}>
               Cancel
             </Button>
-            <Button variant="gradient" onClick={handleAdd} disabled={!form.name.trim() || addMeal.isPending}>
+            <Button variant="gradient" onClick={handleAdd} disabled={!form.name.trim() || addMeal.isPending || adding}>
               <Star className="size-4" /> Log Item
             </Button>
           </DialogFooter>

@@ -1,4 +1,5 @@
-import { AlertTriangle } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
@@ -6,6 +7,12 @@ import { Button } from '@/components/ui/button'
  * Simple reusable "are you sure?" confirmation dialog. Used anywhere a
  * destructive action (delete) needs an explicit confirm step instead of a
  * swipe gesture or an instant, un-confirmed click.
+ *
+ * Guards against double-tapping the confirm button itself: `onConfirm` may
+ * be async, and a synchronous ref-based lock (not just React state, which
+ * only takes effect after a render) ignores a second tap that lands before
+ * the first call finishes -- otherwise a fast double-tap on "Delete" could
+ * fire the delete/save action twice.
  */
 export function ConfirmDialog({
   open,
@@ -23,9 +30,25 @@ export function ConfirmDialog({
   description?: string
   confirmLabel?: string
   cancelLabel?: string
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   destructive?: boolean
 }) {
+  const inFlight = useRef(false)
+  const [pending, setPending] = useState(false)
+
+  const handleConfirm = async () => {
+    if (inFlight.current) return
+    inFlight.current = true
+    setPending(true)
+    try {
+      await onConfirm()
+    } finally {
+      inFlight.current = false
+      setPending(false)
+      onOpenChange(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
@@ -41,16 +64,11 @@ export function ConfirmDialog({
           </DialogBody>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
             {cancelLabel}
           </Button>
-          <Button
-            variant={destructive ? 'destructive' : 'gradient'}
-            onClick={() => {
-              onConfirm()
-              onOpenChange(false)
-            }}
-          >
+          <Button variant={destructive ? 'destructive' : 'gradient'} onClick={handleConfirm} disabled={pending}>
+            {pending && <Loader2 className="size-4 animate-spin" />}
             {confirmLabel}
           </Button>
         </DialogFooter>

@@ -66,19 +66,28 @@ export function isConsecutiveDay(prevDateStr: string | null, currentDateStr: str
  * Like isConsecutiveDay, but a gap of more than 1 day is still considered
  * "unbroken" if every calendar day strictly between prevDateStr and
  * currentDateStr is a designated rest day (0=Sunday..6=Saturday, matching
- * date-fns getDay()). This is what lets a user's streak survive a rest day
- * they didn't log anything on, while still requiring every *non*-rest day
- * in between to have been logged.
+ * date-fns getDay()) or an explicitly frozen date (per-date rest day, see
+ * rest_day_logs). This is what lets a user's streak survive a rest day they
+ * didn't log anything on -- either a repeating weekly rest day or an ad-hoc
+ * "I was unwell this Tuesday" freeze -- while still requiring every *non*-
+ * rest day in between to have been logged.
  */
-export function isBridgeableGap(prevDateStr: string | null, currentDateStr: string, restDays: number[] = []): boolean {
+export function isBridgeableGap(
+  prevDateStr: string | null,
+  currentDateStr: string,
+  restDays: number[] = [],
+  frozenDates: string[] = []
+): boolean {
   if (!prevDateStr) return false
   const diff = daysBetween(prevDateStr, currentDateStr)
   if (diff <= 1) return true
-  if (restDays.length === 0) return false
+  if (restDays.length === 0 && frozenDates.length === 0) return false
   const start = parseISO(prevDateStr)
   for (let i = 1; i < diff; i++) {
-    const between = getDay(addDays(start, i))
-    if (!restDays.includes(between)) return false
+    const between = toDateStr(addDays(start, i))
+    if (frozenDates.includes(between)) continue
+    if (restDays.includes(getDay(parseISO(between)))) continue
+    return false
   }
   return true
 }
@@ -131,27 +140,32 @@ export function earliestEditableDate(asOfDate: string = todayStr()): string {
  * (see isBridgeableGap), so e.g. going to the gym Mon-Sat and resting on a
  * designated Sunday still gives a 7-day streak come next Monday.
  *
+ * `frozenDates` are SPECIFIC calendar days the user marked as rest days
+ * (e.g. "I was unwell this Tuesday" — see rest_day_logs). A gap spanning
+ * only frozen dates doesn't break the streak either, so freezing one or two
+ * unwell days resumes the streak untouched when they come back.
+ *
  * "Current streak" only counts if the most recent logged date is today or
- * bridgeable to today (i.e. any gap to today is entirely rest days) —
+ * bridgeable to today (i.e. any gap to today is entirely rest/frozen days) —
  * otherwise the streak has lapsed and is 0.
  */
-export function computeStreakFromDates(dates: string[], asOfDate: string, restDays: number[] = []): { current: number; longest: number } {
+export function computeStreakFromDates(dates: string[], asOfDate: string, restDays: number[] = [], frozenDates: string[] = []): { current: number; longest: number } {
   const unique = Array.from(new Set(dates)).sort()
   if (unique.length === 0) return { current: 0, longest: 0 }
 
   let longest = 1
   let run = 1
   for (let i = 1; i < unique.length; i++) {
-    run = isBridgeableGap(unique[i - 1], unique[i], restDays) ? run + 1 : 1
+    run = isBridgeableGap(unique[i - 1], unique[i], restDays, frozenDates) ? run + 1 : 1
     longest = Math.max(longest, run)
   }
 
   const lastDate = unique[unique.length - 1]
   let current = 0
-  if (isBridgeableGap(lastDate, asOfDate, restDays)) {
+  if (isBridgeableGap(lastDate, asOfDate, restDays, frozenDates)) {
     current = 1
     for (let i = unique.length - 1; i > 0; i--) {
-      if (isBridgeableGap(unique[i - 1], unique[i], restDays)) current += 1
+      if (isBridgeableGap(unique[i - 1], unique[i], restDays, frozenDates)) current += 1
       else break
     }
   }

@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Plus, Pencil, Trash2, Flame } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useStreakRewards, useCreateStreakReward, useUpdateStreakReward, useDeleteStreakReward } from '@/hooks/use-streak-rewards'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import type { StreakReward, StreakCategory } from '@/types/database.types'
 
 const CATEGORY_LABEL: Record<StreakCategory, string> = {
@@ -60,7 +61,7 @@ export function StreakRewardManager() {
     setDialogOpen(true)
   }
 
-  const handleSave = async () => {
+  const [handleSave, savingInFlight] = useSingleFlight(async () => {
     if (!form.name.trim()) return
     const payload = {
       name: form.name.trim(),
@@ -74,7 +75,7 @@ export function StreakRewardManager() {
       await createReward.mutateAsync(payload)
     }
     setDialogOpen(false)
-  }
+  })
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -179,7 +180,7 @@ export function StreakRewardManager() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="gradient" onClick={handleSave} disabled={!form.name.trim() || createReward.isPending || updateReward.isPending}>
+            <Button variant="gradient" onClick={handleSave} disabled={!form.name.trim() || createReward.isPending || updateReward.isPending || savingInFlight}>
               {editing ? 'Save Changes' : 'Create Reward'}
             </Button>
           </DialogFooter>

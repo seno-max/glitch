@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useChallenges } from '@/hooks/use-analytics'
 import { useAuthStore } from '@/stores/auth.store'
 import { gamificationService } from '@/services/gamification.service'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import { todayStr, weekRange, monthRange } from '@/utils/date'
 import type { ChallengePeriod, ChallengeMetric } from '@/types/database.types'
 import { format, parseISO } from 'date-fns'
@@ -31,7 +32,7 @@ export default function ChallengesPage() {
     rewardXp: '100',
   })
 
-  const handleCreate = async () => {
+  const [handleCreate, creating] = useSingleFlight(async () => {
     if (!user || !form.title.trim() || !form.target) return
     const range = form.period === 'daily' ? { start: todayStr(), end: todayStr() } : form.period === 'weekly' ? weekRange() : monthRange()
     await gamificationService.createChallenge({
@@ -52,7 +53,7 @@ export default function ChallengesPage() {
     queryClient.invalidateQueries({ queryKey: ['challenges'] })
     setOpen(false)
     setForm({ title: '', period: 'weekly', metric: 'gym_days', target: '', rewardXp: '100' })
-  }
+  })
 
   return (
     <div className="space-y-6">
@@ -136,7 +137,7 @@ export default function ChallengesPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button variant="gradient" onClick={handleCreate} disabled={!form.title.trim() || !form.target}>
+            <Button variant="gradient" onClick={handleCreate} disabled={!form.title.trim() || !form.target || creating}>
               Create
             </Button>
           </DialogFooter>

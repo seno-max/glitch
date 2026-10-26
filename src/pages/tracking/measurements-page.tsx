@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { Ruler } from 'lucide-react'
+import { Ruler, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useMeasurementsHistory, useAddMeasurement } from '@/hooks/use-tracking'
+import { useSingleFlight } from '@/hooks/use-single-flight'
+import { EmptyState } from '@/components/shared/empty-state'
 import { todayStr } from '@/utils/date'
 import { format, parseISO } from 'date-fns'
 
@@ -36,12 +39,12 @@ export default function MeasurementsPage() {
     hip: h.hip_cm,
   }))
 
-  const handleSave = async () => {
+  const [handleSave, savingInFlight] = useSingleFlight(async () => {
     const payload: Record<string, number | null> = {}
     for (const f of FIELDS) payload[f.key] = form[f.key] ? Number(form[f.key]) : null
     await addMeasurement.mutateAsync({ date: todayStr(), notes: null, ...payload } as never)
     setForm({})
-  }
+  })
 
   return (
     <div className="space-y-6">
@@ -64,7 +67,7 @@ export default function MeasurementsPage() {
               onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
             />
           ))}
-          <Button variant="gradient" className="col-span-2 sm:col-span-3" onClick={handleSave} disabled={addMeasurement.isPending}>
+          <Button variant="gradient" className="col-span-2 sm:col-span-3" onClick={handleSave} disabled={addMeasurement.isPending || savingInFlight}>
             Save Measurements
           </Button>
         </CardContent>
@@ -87,6 +90,56 @@ export default function MeasurementsPage() {
               <Line type="monotone" dataKey="hip" stroke="#8b5cf6" strokeWidth={2} name="Hip" />
             </LineChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Full history — every field you've ever logged, not just the 3
+          plotted on the chart above (waist/chest/hip). The chart stays
+          focused on those 3 for trend-reading; this section is the
+          complete record for reference. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="size-4" /> All Measurements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!history || history.length === 0 ? (
+            <EmptyState icon={Ruler} title="No measurements logged yet" description="Log your first set of measurements above to start tracking." />
+          ) : (
+            <div className="space-y-3">
+              {history
+                .slice()
+                .reverse()
+                .map((entry) => {
+                  const loggedFields = FIELDS.filter((f) => entry[f.key as keyof typeof entry] !== null)
+                  return (
+                    <div key={entry.id} className="rounded-xl border border-border p-3.5">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <p className="text-sm font-semibold">{format(parseISO(entry.date), 'EEEE, MMM d, yyyy')}</p>
+                        <Badge variant="outline">{loggedFields.length} logged</Badge>
+                      </div>
+                      {loggedFields.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No values recorded for this entry.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {loggedFields.map((f) => (
+                            <div key={f.key} className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
+                              <span className="text-xs text-muted-foreground">{f.label}</span>
+                              <span className="text-sm font-semibold tabular-nums">
+                                {entry[f.key as keyof typeof entry] as number}
+                                <span className="text-xs text-muted-foreground font-normal"> cm</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {entry.notes && <p className="text-xs text-muted-foreground mt-2.5 italic">{entry.notes}</p>}
+                    </div>
+                  )
+                })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

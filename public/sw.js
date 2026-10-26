@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittrack-cache-v1'
+const CACHE_NAME = 'fittrack-cache-v2'
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/icon.svg', '/favicon.svg']
 
 self.addEventListener('install', (event) => {
@@ -17,7 +17,9 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Network-first for navigations/API calls, cache-first for static assets.
+// Network-first for navigations (so app-shell updates land on the next
+// visit, falling back to the cached shell when offline) and cache-first for
+// static assets (hashed/bundled files that rarely change).
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
@@ -25,6 +27,21 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   // Never intercept Supabase/API calls — always go to network.
   if (url.origin !== self.location.origin) return
+
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+          }
+          return response
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('/')))
+    )
+    return
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {

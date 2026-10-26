@@ -4,6 +4,7 @@ import { BarChart3, Clock, Dumbbell, Flame, Footprints, Droplets, TrendingUp, Tr
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ShimmerSkeleton } from '@/components/ui/skeleton'
+import { MetricTile } from '@/components/ui/metric-tile'
 import {
   LineChart,
   Line,
@@ -19,7 +20,6 @@ import {
 } from 'recharts'
 import { useAnalyticsSummary, usePersonalRecords } from '@/hooks/use-analytics'
 import { format, parseISO } from 'date-fns'
-import { cn } from '@/lib/utils'
 
 const PR_ICONS: Record<string, string> = {
   highest_weight: '🏋️',
@@ -55,22 +55,29 @@ export default function AnalyticsPage() {
       </div>
 
       {isLoading || !data ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <ShimmerSkeleton key={i} className="h-24" />
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ShimmerSkeleton key={i} className="h-24 rounded-2xl" />
+            ))}
+          </div>
+          <ShimmerSkeleton className="h-56 rounded-2xl" />
+          <div className="grid lg:grid-cols-2 gap-4">
+            <ShimmerSkeleton className="h-64 rounded-2xl" />
+            <ShimmerSkeleton className="h-64 rounded-2xl" />
+          </div>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Metric icon={Dumbbell} label="Workout Hours" value={`${data.workoutHours}h`} gradient="gradient-primary" />
-            <Metric icon={TrendingUp} label="Strength Volume" value={`${data.strengthVolumeKg.toLocaleString()}kg`} gradient="gradient-secondary" />
-            <Metric icon={Clock} label="Cardio Hours" value={`${data.cardioHours}h`} gradient="gradient-accent" />
-            <Metric icon={Footprints} label="Cardio Distance" value={`${data.cardioDistanceKm}km`} gradient="gradient-fire" />
-            <Metric icon={Clock} label="Avg Workout" value={`${data.avgWorkoutMinutes}min`} gradient="gradient-primary" />
-            <Metric icon={Footprints} label="Avg Steps" value={data.avgSteps.toLocaleString()} gradient="gradient-secondary" />
-            <Metric icon={Droplets} label="Avg Water" value={`${(data.avgWaterMl / 1000).toFixed(1)}L`} gradient="gradient-accent" />
-            <Metric icon={Flame} label="Food Logged" value={`${data.foodLoggingRatePct}%`} gradient="gradient-fire" />
+            <MetricTile align="center" icon={Dumbbell} label="Workout Hours" value={`${data.workoutHours}h`} accent="primary" />
+            <MetricTile align="center" icon={TrendingUp} label="Strength Volume" value={`${data.strengthVolumeKg.toLocaleString()}kg`} accent="primary" />
+            <MetricTile align="center" icon={Clock} label="Cardio Hours" value={`${data.cardioHours}h`} accent="accent" />
+            <MetricTile align="center" icon={Footprints} label="Cardio Distance" value={`${data.cardioDistanceKm}km`} accent="accent" />
+            <MetricTile align="center" icon={Clock} label="Avg Workout" value={`${data.avgWorkoutMinutes}min`} accent="primary" />
+            <MetricTile align="center" icon={Footprints} label="Avg Steps" value={data.avgSteps.toLocaleString()} accent="accent" />
+            <MetricTile align="center" icon={Droplets} label="Avg Water" value={`${(data.avgWaterMl / 1000).toFixed(1)}L`} accent="accent" />
+            <MetricTile align="center" icon={Flame} label="Food Logged" value={`${data.foodLoggingRatePct}%`} accent="fire" />
           </div>
 
           {/* Weekly comparison bar chart */}
@@ -241,42 +248,13 @@ export default function AnalyticsPage() {
           )}
 
           <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Weekly Points</p>
-                <p className="text-xl font-bold">{data.weeklyPoints}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Monthly Points</p>
-                <p className="text-xl font-bold">{data.monthlyPoints}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Most Active Day</p>
-                <p className="text-xl font-bold">{data.mostActiveDay ? format(parseISO(data.mostActiveDay), 'MMM d') : '—'}</p>
-              </CardContent>
-            </Card>
+            <MetricTile align="center" icon={Trophy} label="Weekly Points" value={data.weeklyPoints} accent="fire" />
+            <MetricTile align="center" icon={Trophy} label="Monthly Points" value={data.monthlyPoints} accent="fire" />
+            <MetricTile align="center" icon={BarChart3} label="Most Active Day" value={data.mostActiveDay ? format(parseISO(data.mostActiveDay), 'MMM d') : '—'} accent="secondary" />
           </div>
         </>
       )}
     </div>
-  )
-}
-
-function Metric({ icon: Icon, label, value, gradient }: { icon: typeof Dumbbell; label: string; value: string; gradient: string }) {
-  return (
-    <Card className="card-hover">
-      <CardContent className="p-4">
-        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl mb-2', gradient)}>
-          <Icon className="size-4 text-white" />
-        </div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-lg font-bold">{value}</p>
-      </CardContent>
-    </Card>
   )
 }
 

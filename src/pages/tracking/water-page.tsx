@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { useWaterLogsForDate, useAddWater, useWaterHistory, useSettings } from '@/hooks/use-tracking'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import { todayStr, earliestEditableDate, isWithinEditWindow } from '@/utils/date'
 import { format, parseISO } from 'date-fns'
 
@@ -24,6 +25,10 @@ export default function WaterPage() {
   const editable = isWithinEditWindow(date)
   const goal = settings?.water_goal_ml ?? 3000
   const total = (logs ?? []).reduce((s, l) => s + l.amount_ml, 0)
+
+  const [handleAddWater, addingWater] = useSingleFlight(async (amount: number) => {
+    await addWater.mutateAsync({ date, amountMl: amount })
+  })
 
   const chartData = (history ?? []).reduce<Record<string, number>>((acc, l) => {
     acc[l.date] = (acc[l.date] ?? 0) + l.amount_ml
@@ -55,8 +60,8 @@ export default function WaterPage() {
               <motion.button
                 key={amount}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => addWater.mutate({ date, amountMl: amount })}
-                disabled={!editable || addWater.isPending}
+                onClick={() => handleAddWater(amount)}
+                disabled={!editable || addWater.isPending || addingWater}
                 className="flex flex-col items-center gap-1.5 rounded-xl border border-border p-3 hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:pointer-events-none"
               >
                 <Plus className="size-4 text-blue-500" />

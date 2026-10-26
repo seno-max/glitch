@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
 import { AuthLayout } from '@/components/layout/auth-layout'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,7 @@ type FormValues = z.infer<typeof schema>
 export default function RegisterPage() {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -35,12 +36,37 @@ export default function RegisterPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await authService.signUp(values.email, values.password, values.fullName)
+      const data = await authService.signUp(values.email, values.password, values.fullName)
+      // If "Confirm email" is enabled in Supabase, signUp returns no session —
+      // the user must click the confirmation link before they can sign in.
+      // Show a "check your email" state instead of navigating into the app
+      // (which the auth guard would just bounce back to /login).
+      if (!data.session) {
+        setAwaitingConfirmation(values.email)
+        return
+      }
       toast.success('Account created! Let\'s set up your profile.')
       navigate('/onboarding', { replace: true })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sign up failed')
     }
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthLayout title="Check your email" subtitle="We sent you a confirmation link">
+        <div className="flex flex-col items-center text-center gap-3 py-6">
+          <CheckCircle2 className="size-12 text-success" />
+          <p className="font-semibold">Confirm your email address</p>
+          <p className="text-sm text-muted-foreground">
+            We've sent a confirmation link to <span className="font-medium">{awaitingConfirmation}</span>. Click it, then sign in to continue.
+          </p>
+          <Link to="/login" className="text-primary font-semibold hover:underline text-sm mt-2">
+            Back to sign in
+          </Link>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (

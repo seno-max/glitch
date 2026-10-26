@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Flame, Trophy, Star, Check } from 'lucide-react'
+import { Flame, Trophy, Footprints, Check } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import type { DashboardSummary } from '@/types/models'
 import { todayStr } from '@/utils/date'
@@ -44,7 +44,7 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
       <div className="relative z-10">
         <p className="text-white/60 text-sm font-medium">{summary.greeting} 👋</p>
         <h1 className="text-2xl sm:text-3xl font-bold mt-1">{pickHeadline(summary)}</h1>
-        <p className="text-white/40 text-xs mt-2 italic">“{dailyQuote()}”</p>
+        <p className="text-white/50 text-xs mt-2 italic">“{dailyQuote()}”</p>
 
         {(summary.currentWeightKg !== null || summary.goalWeightKg !== null) && (
           <div className="flex items-center gap-4 mt-5 text-white/70 text-xs">
@@ -63,27 +63,25 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
         )}
 
         <div className="mt-6 flex items-center gap-2 flex-wrap">
+          {/* Points use the app's "fire" accent (amber); streaks use the
+              same primary/accent colors as everywhere else in the app
+              (gym = primary/emerald, steps = accent/cyan) instead of each
+              pill inventing its own one-off color. */}
           <div className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-400/20 px-3 py-1.5">
             <Trophy className="size-4 text-amber-400" />
             <span className="text-sm font-semibold">
               <AnimatedCounter value={summary.pointsToday} /> pts today
             </span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/20 px-3 py-1.5">
-            <Star className="size-4 text-fuchsia-300" />
-            <span className="text-sm font-semibold">
-              <AnimatedCounter value={summary.totalPoints} /> total pts
-            </span>
-          </div>
           {gymStreak && gymStreak.current_streak > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 px-3 py-1.5">
-              <Flame className="size-4 text-orange-400" />
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/20 px-3 py-1.5">
+              <Flame className="size-4 text-emerald-400" />
               <span className="text-sm font-semibold">{gymStreak.current_streak} day gym streak</span>
             </div>
           )}
           {stepsStreak && stepsStreak.current_streak > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-rose-500/15 border border-rose-400/20 px-3 py-1.5">
-              <Flame className="size-4 text-rose-400" />
+            <div className="flex items-center gap-1.5 rounded-full bg-sky-500/15 border border-sky-400/20 px-3 py-1.5">
+              <Footprints className="size-4 text-sky-400" />
               <span className="text-sm font-semibold">{stepsStreak.current_streak} day step streak</span>
             </div>
           )}
@@ -120,7 +118,7 @@ export function HeroHealthCard({ summary }: { summary: DashboardSummary }) {
                   >
                     {d.active && <Check className="size-4 text-white" strokeWidth={3} />}
                   </div>
-                  <span className={cn('text-[10px]', isToday ? 'text-white font-semibold' : 'text-white/40')}>
+                  <span className={cn('text-[10px]', isToday ? 'text-white font-semibold' : 'text-white/50')}>
                     {format(parseISO(d.date), 'EEEEE')}
                   </span>
                 </motion.div>

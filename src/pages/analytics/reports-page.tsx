@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { format } from 'date-fns'
+import { saveOrDownloadFile } from '@/utils/file-download'
 import toast from 'react-hot-toast'
 
 export default function ReportsPage() {
@@ -15,7 +16,7 @@ export default function ReportsPage() {
   const { data: yearly } = useAnalyticsSummary(365)
   const { data: records } = usePersonalRecords()
 
-  const generateReport = (period: 'monthly' | 'yearly') => {
+  const generateReport = async (period: 'monthly' | 'yearly') => {
     const data = period === 'monthly' ? monthly : yearly
     if (!data) {
       toast.error('Data not loaded yet')
@@ -59,8 +60,16 @@ export default function ReportsPage() {
       })
     }
 
-    doc.save(`fittrack-${period}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
-    toast.success('Report downloaded!')
+    // doc.save() blob downloads don't work inside the Android WebView —
+    // saveOrDownloadFile falls back to writing the PDF via the Filesystem
+    // plugin on native (see utils/file-download.ts).
+    try {
+      const blob = doc.output('blob') as Blob
+      const savedTo = await saveOrDownloadFile(`fittrack-${period}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`, 'application/pdf', blob)
+      toast.success(`Report ready${savedTo.startsWith('file:') || savedTo.startsWith('/') ? ` — saved to ${savedTo}` : ' — download started!'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate report')
+    }
   }
 
   const reports = [
@@ -89,8 +98,7 @@ export default function ReportsPage() {
             <p className="text-sm text-muted-foreground mb-4">Complete summary of your last 30 days of activity.</p>
             <Button variant="gradient" className="w-full" onClick={() => generateReport('monthly')}>
               <Download className="size-4" /> Download PDF
-            </Button>
-          </CardContent>
+            </Button>          </CardContent>
         </Card>
         <Card className="card-hover">
           <CardHeader>

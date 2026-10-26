@@ -23,7 +23,9 @@ import { Avatar } from '@/components/ui/avatar'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore } from '@/stores/ui.store'
 import { useDashboard } from '@/hooks/use-dashboard'
+import { useUnreadNotificationCount } from '@/hooks/use-notifications'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { NotificationsPanel } from '@/components/layout/notifications-panel'
 import { useState } from 'react'
 
 const mainNav = [
@@ -88,7 +90,7 @@ function SidebarMotivation() {
 
   if (gymStreak > 0) {
     return (
-      <p className="text-xs text-orange-500 font-medium flex items-center gap-1">
+      <p className="text-xs text-emerald-500 font-medium flex items-center gap-1">
         <Flame className="size-3" /> {gymStreak} day streak
       </p>
     )
@@ -103,10 +105,13 @@ export function AppShell() {
   const { profile } = useAuthStore()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { containerRef, pullDistance, refreshing } = usePullToRefresh(async () => {
     await queryClient.invalidateQueries()
   })
+  const { data: unreadCount } = useUnreadNotificationCount()
+  const hasUnread = (unreadCount ?? 0) > 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -149,8 +154,13 @@ export function AppShell() {
         </div>
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <button className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted">
+          <button
+            onClick={() => setNotificationsOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted relative"
+            title="Notifications"
+          >
             <Bell className="size-4" />
+            {hasUnread && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />}
           </button>
         </div>
       </header>
@@ -158,9 +168,13 @@ export function AppShell() {
       {/* Desktop top bar */}
       <header className="hidden lg:flex fixed top-0 left-64 right-0 z-20 items-center justify-end h-16 px-6 border-b border-border bg-background/60 backdrop-blur-xl gap-2">
         <ThemeToggle />
-        <button className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted relative">
+        <button
+          onClick={() => setNotificationsOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted relative"
+          title="Notifications"
+        >
           <Bell className="size-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />
+          {hasUnread && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />}
         </button>
       </header>
 
@@ -249,6 +263,8 @@ export function AppShell() {
           </NavLink>
         ))}
       </nav>
+
+      <NotificationsPanel open={notificationsOpen} onOpenChange={setNotificationsOpen} />
     </div>
   )
 }

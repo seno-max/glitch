@@ -1,11 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
-import { useEffect, Suspense, lazy } from 'react'
+import { useEffect, useRef, Suspense, lazy } from 'react'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUIStore, applyTheme } from '@/stores/ui.store'
 import { useAndroidBackButton } from '@/hooks/use-android-back-button'
 import { useNativeStatusBar } from '@/hooks/use-native-status-bar'
+import { useAppUrlOpen } from '@/hooks/use-app-url-open'
+import { useSettings } from '@/hooks/use-tracking'
+import { notificationService } from '@/services/notification.service'
 
 import { AuthGuard } from '@/components/layout/auth-guard'
 import { GuestGuard } from '@/components/layout/guest-guard'
@@ -62,6 +65,39 @@ const queryClient = new QueryClient({
 function NativeAppBindings() {
   useAndroidBackButton()
   useNativeStatusBar()
+  useAppUrlOpen()
+  return null
+}
+
+/**
+ * Once the user's settings load (and whenever their notification preferences
+ * change), requests the POST_NOTIFICATIONS runtime permission and
+ * re-schedules the Android daily reminder notifications to match.
+ */
+function NotificationSettingsBindings() {
+  const { data: settings } = useSettings()
+  const lastSyncedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!settings) return
+    const signature = JSON.stringify({
+      t: [
+        settings.notif_workout_reminder,
+        settings.notif_water_reminder,
+        settings.notif_food_reminder,
+        settings.notif_weight_reminder,
+        settings.notif_photo_reminder,
+        settings.notif_challenge_reminder,
+      ],
+      r: settings.reminder_times,
+    })
+    if (signature === lastSyncedRef.current) return
+    lastSyncedRef.current = signature
+    notificationService.requestPermissionsIfNeeded().then(() =>
+      notificationService.syncScheduledReminders(settings)
+    )
+  }, [settings])
+
   return null
 }
 
@@ -87,6 +123,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <NativeAppBindings />
+        <NotificationSettingsBindings />
         <Toaster
           position="top-center"
           toastOptions={{

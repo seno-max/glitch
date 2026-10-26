@@ -13,6 +13,7 @@ import { useWorkoutLogStore, type DraftExercise } from '@/stores/workout-log.sto
 import { exerciseLibraryService } from '@/services/exercise-library.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { useQuery } from '@tanstack/react-query'
+import { useSingleFlight } from '@/hooks/use-single-flight'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/utils/haptics'
 import toast from 'react-hot-toast'
@@ -112,7 +113,7 @@ export function ExerciseLogger({ readOnly = false }: { readOnly?: boolean } = {}
     setNewExIsMachineCardio(false)
   }
 
-  const confirmSaveToLibrary = async () => {
+  const [confirmSaveToLibrary, savingToLibrary] = useSingleFlight(async () => {
     if (!saveDialog || !user) return
     try {
       await exerciseLibraryService.createCustom(user.id, {
@@ -130,7 +131,7 @@ export function ExerciseLogger({ readOnly = false }: { readOnly?: boolean } = {}
       toast.error('Could not save to exercise library, but it\u2019s still logged for today')
     }
     setSaveDialog(null)
-  }
+  })
 
   const grouped: Record<Group, DraftExercise[]> = { strength: [], timed: [], machine: [] }
   for (const ex of exercises) grouped[groupOf(ex)].push(ex)
@@ -253,7 +254,7 @@ export function ExerciseLogger({ readOnly = false }: { readOnly?: boolean } = {}
             <Button variant="ghost" onClick={() => setSaveDialog(null)}>
               Skip
             </Button>
-            <Button variant="gradient" onClick={confirmSaveToLibrary}>
+            <Button variant="gradient" onClick={confirmSaveToLibrary} disabled={savingToLibrary}>
               Save to Library
             </Button>
           </DialogFooter>

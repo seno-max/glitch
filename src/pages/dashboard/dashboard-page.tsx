@@ -8,7 +8,7 @@ import { PeriodProgressCard } from '@/components/dashboard/period-progress-card'
 import { WeeklyRecapCard } from '@/components/dashboard/weekly-recap-card'
 import { SmartSuggestions } from '@/components/dashboard/smart-suggestions'
 import { MoreFeaturesGrid } from '@/components/dashboard/more-features-grid'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ShimmerSkeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDisplayDate } from '@/utils/date'
 
@@ -19,16 +19,24 @@ export default function DashboardPage() {
   if (isLoading || !data) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-56 w-full rounded-3xl" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-2xl" />
+        {/* Hero card shape */}
+        <ShimmerSkeleton className="h-56 w-full rounded-3xl" />
+        {/* Today's Progress: 3 rings */}
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <ShimmerSkeleton key={i} className="h-28 rounded-2xl" />
           ))}
         </div>
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Skeleton className="h-80 rounded-2xl" />
-          <Skeleton className="h-80 rounded-2xl" />
+        {/* Quick actions row */}
+        <div className="flex gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <ShimmerSkeleton key={i} className="h-20 w-16 rounded-2xl shrink-0" />
+          ))}
         </div>
+        {/* Habits list */}
+        <ShimmerSkeleton className="h-48 rounded-2xl" />
+        {/* Progress + explore */}
+        <ShimmerSkeleton className="h-40 rounded-2xl" />
       </div>
     )
   }
